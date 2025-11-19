@@ -41,12 +41,21 @@ struct RichTextEditor: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.onTextChange = onTextChange
 
+        // Update initialText if it's empty and we now have content (handles first boot case)
+        if context.coordinator.initialText.isEmpty && !text.isEmpty {
+            context.coordinator.initialText = text
+        }
+
         // Only update if text changed externally (e.g., switching notes)
         if context.coordinator.shouldUpdateContent(newText: text) {
             // Only set content if the editor is ready
             guard context.coordinator.isReady else {
                 // Store the text to set once ready
                 context.coordinator.pendingText = text
+                // Also update initialText in case ready hasn't fired yet
+                if context.coordinator.initialText.isEmpty {
+                    context.coordinator.initialText = text
+                }
                 return
             }
             
@@ -132,12 +141,15 @@ struct RichTextEditor: NSViewRepresentable {
             case "ready":
                 isReady = true
                 
-                // Determine which text to set (pending text takes priority, then initial text)
-                let textToSet = pendingText ?? initialText
+                // Determine which text to set (pending text takes priority, then current binding value, then initial text)
+                // This handles the case where the binding was updated after makeNSView but before ready fired
+                let currentText = _text.wrappedValue
+                let textToSet = pendingText ?? (currentText.isEmpty ? initialText : currentText)
                 pendingText = nil
                 
                 // Set content once editor is ready
                 if !textToSet.isEmpty {
+                    print("🔄 RichTextEditor: Setting initial content on ready (\(textToSet.count) chars)")
                     // Use JSON encoding for safe string escaping
                     if let escapedText = escapeForJavaScript(textToSet) {
                         let jsCode = "window.setContent(\"\(escapedText)\");"
@@ -149,9 +161,15 @@ struct RichTextEditor: NSViewRepresentable {
                             }
                         }
                         lastSetText = textToSet
+                        // Update initialText if it was empty
+                        if initialText.isEmpty {
+                            initialText = textToSet
+                        }
                     } else {
                         print("❌ Error encoding initial text to JSON")
                     }
+                } else {
+                    print("⚠️ RichTextEditor: Ready but no content to set")
                 }
 
             case "textChange":
