@@ -29,12 +29,6 @@ struct SlashCommandView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color(nsColor: .controlBackgroundColor))
-            .overlay(
-                Rectangle()
-                    .frame(height: 1)
-                    .foregroundColor(Color(nsColor: .separatorColor)),
-                alignment: .bottom
-            )
 
             // Commands list
             ScrollViewReader { proxy in
