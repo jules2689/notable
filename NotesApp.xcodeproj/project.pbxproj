@@ -25,6 +25,7 @@
 		AA0016 /* ComponentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0017 /* ComponentParser.swift */; };
 		AA0017 /* SlashCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* SlashCommandView.swift */; };
 		AA0018 /* SlashCommandTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0019 /* SlashCommandTextEditor.swift */; };
+		AA0020 /* WYSIWYMTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0020 /* WYSIWYMTextEditor.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -49,6 +50,7 @@
 		BB0017 /* ComponentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentParser.swift; sourceTree = "<group>"; };
 		BB0018 /* SlashCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandView.swift; sourceTree = "<group>"; };
 		BB0019 /* SlashCommandTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandTextEditor.swift; sourceTree = "<group>"; };
+		BB0020 /* WYSIWYMTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WYSIWYMTextEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +89,7 @@
 				BB0014 /* MarkdownView.swift */,
 				BB0018 /* SlashCommandView.swift */,
 				BB0019 /* SlashCommandTextEditor.swift */,
+				BB0020 /* WYSIWYMTextEditor.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -230,6 +233,7 @@
 				AA0016 /* ComponentParser.swift in Sources */,
 				AA0017 /* SlashCommandView.swift in Sources */,
 				AA0018 /* SlashCommandTextEditor.swift in Sources */,
+				AA0020 /* WYSIWYMTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

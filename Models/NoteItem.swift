@@ -85,5 +85,5 @@ extension NoteItem {
 // MARK: - UTType Extension
 
 extension UTType {
-    static let noteItem = UTType(exportedAs: "com.notesapp.noteitem")
+    static let noteItem = UTType(exportedAs: "com.notable.noteitem")
 }
