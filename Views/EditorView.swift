@@ -52,6 +52,7 @@ struct EditorView: View {
             }
         }
         .navigationTitle("") // Gets rid of the default navigation title
+        .toolbarBackground(.clear, for: .navigationBar)
         .toolbar {
             // Editable title on the left side of the title bar
             ToolbarItem(placement: .navigation) {
@@ -90,7 +91,7 @@ struct EditorView: View {
                         }
                     ))
                     .textFieldStyle(.plain)
-                    .font(.headline)
+                    .font(.title2)
                     .frame(maxWidth: 300)
                     .onSubmit {
                         // Rename immediately on submit (Enter key)
