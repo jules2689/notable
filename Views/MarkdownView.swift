@@ -49,6 +49,8 @@ struct MarkdownView: NSViewRepresentable {
         }
 
         let isDarkMode = colorScheme == .dark
+        let highlightTheme = isDarkMode ? "github-dark" : "github"
+
         let styledHTML = """
         <!DOCTYPE html>
         <html>
@@ -56,12 +58,15 @@ struct MarkdownView: NSViewRepresentable {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="color-scheme" content="light dark">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/\(highlightTheme).min.css">
             <style>
                 \(MarkdownRenderer.customCSS(isDarkMode: isDarkMode))
             </style>
         </head>
         <body>
             \(html)
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+            <script>hljs.highlightAll();</script>
         </body>
         </html>
         """
@@ -133,19 +138,25 @@ extension MarkdownRenderer {
         }
 
         pre {
-            background-color: \(preBackground);
+            background-color: \(preBackground) !important;
             padding: 16px;
             overflow: auto;
             font-size: 85%;
             line-height: 1.45;
             border-radius: 6px;
+            margin: 16px 0;
         }
 
         pre code {
-            background-color: transparent;
+            background-color: transparent !important;
             padding: 0;
             margin: 0;
             border-radius: 0;
+            font-size: inherit;
+        }
+
+        pre code.hljs {
+            background-color: transparent !important;
         }
 
         blockquote {
@@ -169,13 +180,15 @@ extension MarkdownRenderer {
         table {
             border-collapse: collapse;
             width: 100%;
-            margin-bottom: 16px;
+            margin: 16px 0;
+            display: table;
         }
 
         table th, table td {
-            padding: 6px 13px;
+            padding: 8px 12px;
             border: 1px solid \(borderColor);
             color: \(textColor);
+            text-align: left;
         }
 
         table th {
@@ -183,8 +196,12 @@ extension MarkdownRenderer {
             background-color: \(tableHeaderBackground);
         }
 
-        table tr:nth-child(2n) {
+        table tbody tr:nth-child(2n) {
             background-color: \(tableRowBackground);
+        }
+
+        table tbody tr:hover {
+            background-color: \(isDarkMode ? "#333" : "#f0f0f0");
         }
 
         hr {
@@ -201,17 +218,29 @@ extension MarkdownRenderer {
         }
 
         input[type="checkbox"] {
-            margin-right: 0.5em;
+            margin: 0 0.5em 0 0;
+            vertical-align: middle;
         }
 
         /* Task list support */
-        .task-list-item {
-            list-style-type: none;
+        ul.contains-task-list {
+            list-style: none;
+            padding-left: 1.5em;
         }
 
-        .task-list-item input {
-            margin: 0 0.5em 0.25em -1.6em;
+        .task-list-item {
+            list-style-type: none;
+            position: relative;
+        }
+
+        .task-list-item input[type="checkbox"] {
+            margin: 0 0.5em 0.25em -1.5em;
             vertical-align: middle;
+            cursor: pointer;
+        }
+
+        .task-list-item input[type="checkbox"]:disabled {
+            cursor: default;
         }
 
         strong {

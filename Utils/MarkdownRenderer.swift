@@ -5,11 +5,18 @@ import Down
 /// Utility for rendering GitHub Flavored Markdown to various formats
 class MarkdownRenderer {
 
-    /// Renders markdown to HTML string
+    /// Renders markdown to HTML string with GitHub Flavored Markdown extensions
     static func toHTML(_ markdown: String) -> String? {
         do {
             let down = Down(markdownString: markdown)
-            return try down.toHTML()
+
+            // Enable GitHub Flavored Markdown options and extensions
+            var options = DownOptions()
+            options.insert(.smartQuotes)
+            options.insert(.validateUTF8)
+            options.insert(.githubPreLang)
+
+            return try down.toHTML(.default, extensions: .all)
         } catch {
             print("Markdown to HTML conversion failed: \(error)")
             return nil
