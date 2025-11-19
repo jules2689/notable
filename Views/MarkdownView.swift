@@ -24,8 +24,11 @@ struct MarkdownView: NSViewRepresentable {
         let isDarkMode = colorScheme == .dark
         let highlightTheme = isDarkMode ? "github-dark" : "github"
 
+        // Process custom components before rendering markdown
+        let processedMarkdown = ComponentParser.replaceComponents(in: markdownToRender, darkMode: isDarkMode)
+
         // Escape the markdown for JavaScript
-        let escapedMarkdown = markdownToRender
+        let escapedMarkdown = processedMarkdown
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
             .replacingOccurrences(of: "$", with: "\\$")
@@ -54,6 +57,8 @@ struct MarkdownView: NSViewRepresentable {
                     pedantic: false,
                     smartLists: true,
                     smartypants: false,  // Disable smart quotes
+                    headerIds: false,
+                    mangle: false,
                     highlight: function(code, lang) {
                         if (lang && hljs.getLanguage(lang)) {
                             try {
@@ -61,6 +66,15 @@ struct MarkdownView: NSViewRepresentable {
                             } catch (e) {}
                         }
                         return hljs.highlightAuto(code).value;
+                    }
+                });
+
+                // Allow HTML passthrough (marked.js preserves HTML by default)
+                marked.use({
+                    renderer: {
+                        html(html) {
+                            return html;  // Pass HTML through unchanged
+                        }
                     }
                 });
 
