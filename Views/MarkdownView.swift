@@ -81,6 +81,11 @@ struct MarkdownView: NSViewRepresentable {
                 // Render markdown
                 const markdown = `\(escapedMarkdown)`;
                 document.getElementById('content').innerHTML = marked.parse(markdown);
+
+                // Apply syntax highlighting to all code blocks
+                document.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
             </script>
         </body>
         </html>
