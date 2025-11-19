@@ -56,6 +56,14 @@ enum NoteItem: Identifiable, Codable, Hashable, Transferable {
         }
         return false
     }
+    
+    /// Returns children if this is a folder, nil otherwise (for OutlineGroup compatibility)
+    var children: [NoteItem]? {
+        if case .folder(let folder) = self {
+            return folder.children.isEmpty ? nil : folder.children
+        }
+        return nil
+    }
 
     // MARK: - Transferable Conformance
 

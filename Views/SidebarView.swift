@@ -1,8 +1,10 @@
 import SwiftUI
+import AppKit
 
 struct SidebarView: View {
     var viewModel: NotesViewModel
     @Binding var searchText: String
+    @State private var draggedItem: NoteItem?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,25 +35,18 @@ struct SidebarView: View {
                 }
                 Spacer()
             } else {
-                List(selection: Binding(
-                    get: { viewModel.selectedNoteItem },
-                    set: { newValue in
-                        if let item = newValue {
-                            switch item {
-                            case .note(let note):
-                                viewModel.selectNote(note)
-                            case .folder(let folder):
-                                viewModel.selectFolder(folder)
-                            }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(viewModel.noteItems) { item in
+                            HierarchicalNoteItemRow(
+                                item: item,
+                                viewModel: viewModel,
+                                level: 0,
+                                draggedItem: $draggedItem
+                            )
                         }
                     }
-                )) {
-                    ForEach(viewModel.noteItems) { item in
-                        NoteItemRow(item: item, viewModel: viewModel)
-                            .tag(item)
-                    }
                 }
-                .listStyle(.sidebar)
             }
         }
         .navigationTitle("")
@@ -111,126 +106,220 @@ struct SearchBar: View {
     }
 }
 
-// MARK: - Note Item Row
+// MARK: - Hierarchical Note Item Row
 
-struct NoteItemRow: View {
+struct HierarchicalNoteItemRow: View {
     let item: NoteItem
     var viewModel: NotesViewModel
+    let level: Int
+    @Binding var draggedItem: NoteItem?
     @State private var showingRenameAlert = false
     @State private var showingDeleteAlert = false
     @State private var newName = ""
     @State private var isTargeted = false
+    
+    private var isExpanded: Bool {
+        if case .folder(let folder) = item {
+            return viewModel.isFolderExpanded(folder)
+        }
+        return false
+    }
+    
+    private var folder: Folder? {
+        if case .folder(let folder) = item {
+            return folder
+        }
+        return nil
+    }
 
     var body: some View {
-        HStack {
-            Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
-                .foregroundStyle(item.isFolder ? .blue : .secondary)
-                .font(.system(size: 14))
-
-            Text(item.name)
-                .lineLimit(1)
-
-            Spacer()
-
-            // Show item count for folders
-            if item.isFolder, case .folder(let folder) = item {
-                Text("\(folder.children.count)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .background(isTargeted ? Color.accentColor.opacity(0.2) : Color.clear)
-        .contextMenu {
-            if item.isNote {
-                Button {
-                    newName = item.name
-                    showingRenameAlert = true
-                } label: {
-                    Label("Rename", systemImage: "pencil")
+        VStack(alignment: .leading, spacing: 0) {
+            // Main row
+            HStack(spacing: 4) {
+                // Indentation for nested items
+                if level > 0 {
+                    ForEach(0..<level, id: \.self) { _ in
+                        Rectangle()
+                            .fill(Color.clear)
+                            .frame(width: 16)
+                    }
                 }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    showingDeleteAlert = true
-                } label: {
-                    Label("Delete", systemImage: "trash")
+                
+                // Expand/collapse button for folders
+                if item.isFolder, let folder = folder {
+                    Button {
+                        viewModel.toggleFolderExpansion(folder)
+                    } label: {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16, height: 16)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Spacer for non-folder items to align with folders
+                    Spacer()
+                        .frame(width: 16)
                 }
-            } else if item.isFolder {
-                Button {
-                    newName = item.name
-                    showingRenameAlert = true
-                } label: {
-                    Label("Rename", systemImage: "pencil")
-                }
-
-                Divider()
-
-                Button(role: .destructive) {
-                    showingDeleteAlert = true
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
-        .draggable(item) {
-            // Drag preview
-            HStack {
+                
                 Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
                     .foregroundStyle(item.isFolder ? .blue : .secondary)
+                    .font(.system(size: 14))
+
                 Text(item.name)
+                    .lineLimit(1)
+
+                Spacer()
+
+                // Show item count for folders
+                if item.isFolder, let folder = folder {
+                    Text("\(folder.children.count)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
-            .padding(8)
-            .background(.background)
-            .cornerRadius(8)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+            .background(
+                Group {
+                    if viewModel.selectedNoteItem?.id == item.id {
+                        Color.accentColor.opacity(0.2)
+                    } else if isTargeted && item.isFolder {
+                        Color.accentColor.opacity(0.15)
+                    } else {
+                        Color.clear
+                    }
+                }
+            )
+            .onDrag {
+                draggedItem = item
+                // Create NSItemProvider for drag with the item's ID as a simple string
+                let provider = NSItemProvider(object: item.id.uuidString as NSString)
+                provider.suggestedName = item.name
+                return provider
+            }
+            .contextMenu {
+                if item.isNote {
+                    Button {
+                        newName = item.name
+                        showingRenameAlert = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } else if item.isFolder {
+                    Button {
+                        newName = item.name
+                        showingRenameAlert = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+            .alert("Rename \(item.isFolder ? "Folder" : "Note")", isPresented: $showingRenameAlert) {
+                TextField("Name", text: $newName)
+                Button("Cancel", role: .cancel) { }
+                Button("Rename") {
+                    if item.isNote, case .note(let note) = item {
+                        viewModel.renameNote(note, to: newName)
+                    } else if item.isFolder, case .folder(let folder) = item {
+                        viewModel.renameFolder(folder, to: newName)
+                    }
+                }
+            }
+            .alert("Delete \(item.isFolder ? "Folder" : "Note")?", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    if item.isNote, case .note(let note) = item {
+                        viewModel.deleteNote(note)
+                    } else if item.isFolder, case .folder(let folder) = item {
+                        viewModel.deleteFolder(folder)
+                    }
+                }
+            } message: {
+                if item.isFolder {
+                    Text("This will permanently delete the folder and all its contents.")
+                } else {
+                    Text("This will permanently delete this note.")
+                }
+            }
+            
+            // Recursively show children if folder is expanded
+            if item.isFolder, let folder = folder, isExpanded {
+                ForEach(folder.children) { childItem in
+                    HierarchicalNoteItemRow(
+                        item: childItem,
+                        viewModel: viewModel,
+                        level: level + 1,
+                        draggedItem: $draggedItem
+                    )
+                }
+            }
         }
-        .dropDestination(for: NoteItem.self) { droppedItems, location in
-            // Only allow dropping on folders
-            guard item.isFolder, case .folder(let folder) = item else {
+        .contentShape(Rectangle())
+        .onTapGesture {
+            switch item {
+            case .note(let note):
+                viewModel.selectNote(note)
+            case .folder(let folder):
+                viewModel.selectFolder(folder)
+            }
+        }
+        .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
+            guard item.isFolder else {
                 return false
             }
-
-            // Move each dropped item to this folder
-            for droppedItem in droppedItems {
-                // Don't allow dropping a folder into itself
-                if droppedItem.id != item.id {
-                    viewModel.moveItem(droppedItem, to: folder)
+            
+            guard case .folder(let targetFolder) = item else {
+                return false
+            }
+            
+            // Use the dragged item from state (most reliable)
+            if let dropped = draggedItem {
+                if !isDescendant(dropped, of: item) {
+                    viewModel.moveItem(dropped, to: targetFolder)
+                    draggedItem = nil
+                    return true
                 }
             }
-
+            
+            return false
+        }
+    }
+    
+    /// Checks if an item is a descendant of another item (to prevent circular moves)
+    private func isDescendant(_ item: NoteItem, of ancestor: NoteItem) -> Bool {
+        if item.id == ancestor.id {
             return true
-        } isTargeted: { isTargeted in
-            self.isTargeted = isTargeted
         }
-        .alert("Rename \(item.isFolder ? "Folder" : "Note")", isPresented: $showingRenameAlert) {
-            TextField("Name", text: $newName)
-            Button("Cancel", role: .cancel) { }
-            Button("Rename") {
-                if item.isNote, case .note(let note) = item {
-                    viewModel.renameNote(note, to: newName)
-                } else if item.isFolder, case .folder(let folder) = item {
-                    viewModel.renameFolder(folder, to: newName)
-                }
+        
+        guard case .folder(let ancestorFolder) = ancestor else {
+            return false
+        }
+        
+        for child in ancestorFolder.children {
+            if isDescendant(item, of: child) {
+                return true
             }
         }
-        .alert("Delete \(item.isFolder ? "Folder" : "Note")?", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                if item.isNote, case .note(let note) = item {
-                    viewModel.deleteNote(note)
-                } else if item.isFolder, case .folder(let folder) = item {
-                    viewModel.deleteFolder(folder)
-                }
-            }
-        } message: {
-            if item.isFolder {
-                Text("This will permanently delete the folder and all its contents.")
-            } else {
-                Text("This will permanently delete this note.")
-            }
-        }
+        
+        return false
     }
 }
 
