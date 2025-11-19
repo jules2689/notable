@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
     <style>
         * {
             margin: 0;
@@ -424,17 +430,57 @@
                 const trimmedLocation = location.trim();
                 const escapedLocation = escapeAttribute(trimmedLocation);
                 const encodedLocation = encodeURIComponent(trimmedLocation);
+                const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
 
-                // Use OpenStreetMap iframe embed with search query
-                // This will automatically geocode and display the location
-                const osmURL = `https://www.openstreetmap.org/export/embed.html?marker=1&query=${encodedLocation}`;
+                // Initialize Leaflet map after DOM is ready
+                setTimeout(() => {
+                    const mapElement = document.getElementById(mapId);
+                    if (!mapElement || mapElement.dataset.initialized === 'true') return;
+
+                    mapElement.dataset.initialized = 'true';
+
+                    // Fetch coordinates from Nominatim
+                    fetch(`https://nominatim.openstreetmap.org/search?q=${encodedLocation}&format=json&limit=1`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data && data.length > 0) {
+                                const result = data[0];
+                                const lat = parseFloat(result.lat);
+                                const lon = parseFloat(result.lon);
+
+                                // Initialize the map
+                                const map = L.map(mapId).setView([lat, lon], 13);
+
+                                // Store map instance for later cleanup
+                                if (!window.leafletMaps) window.leafletMaps = {};
+                                window.leafletMaps[mapId] = map;
+
+                                // Add OpenStreetMap tile layer
+                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                                    maxZoom: 19
+                                }).addTo(map);
+
+                                // Add marker
+                                L.marker([lat, lon]).addTo(map)
+                                    .bindPopup(trimmedLocation)
+                                    .openPopup();
+                            } else {
+                                mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Location not found</div>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error geocoding location:', error);
+                            mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error loading map</div>';
+                        });
+                }, 100);
 
                 return `<div class="map-container component-wrapper" contenteditable="false" data-component="map" data-location="${escapedLocation}">
                     <div class="component-header" style="padding: 6px 12px; background: var(--code-bg); border-bottom: 1px solid var(--border-color); font-size: 12px; display: flex; align-items: center; gap: 8px;">
                         <span style="color: var(--secondary-color);">📍 Map:</span>
                         <span class="component-location" contenteditable="true" style="flex: 1; padding: 2px 6px; background: var(--bg-color); border-radius: 3px; outline: none;">${trimmedLocation}</span>
                     </div>
-                    <iframe src="${osmURL}" style="width: 100%; height: 300px; border: none; display: block; pointer-events: none;" loading="lazy"></iframe>
+                    <div id="${mapId}" style="width: 100%; height: 300px; background: var(--code-bg);"></div>
                     <div style="padding: 4px 8px; background: var(--code-bg); text-align: right; font-size: 10px;">
                         <a href="https://www.openstreetmap.org/search?query=${encodedLocation}" target="_blank" style="color: var(--secondary-color); text-decoration: none; pointer-events: auto;">
                             View on OpenStreetMap →
@@ -532,10 +578,57 @@
                         container.setAttribute('data-location', newLocation);
                         const encoded = encodeURIComponent(newLocation);
 
-                        // Update the iframe to show the new location
-                        const iframe = container.querySelector('iframe');
-                        if (iframe) {
-                            iframe.src = `https://www.openstreetmap.org/export/embed.html?marker=1&query=${encoded}`;
+                        // Find the map div
+                        const mapDiv = container.querySelector('[id^="map-"]');
+                        if (mapDiv) {
+                            const mapId = mapDiv.id;
+
+                            // Remove existing Leaflet map instance if it exists
+                            if (window.leafletMaps && window.leafletMaps[mapId]) {
+                                window.leafletMaps[mapId].remove();
+                                delete window.leafletMaps[mapId];
+                            }
+
+                            // Clear the div
+                            mapDiv.innerHTML = '';
+                            mapDiv.dataset.initialized = 'false';
+
+                            // Reload the map with new location
+                            fetch(`https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data && data.length > 0) {
+                                        const result = data[0];
+                                        const lat = parseFloat(result.lat);
+                                        const lon = parseFloat(result.lon);
+
+                                        // Initialize the map
+                                        const map = L.map(mapId).setView([lat, lon], 13);
+
+                                        // Store map instance for later cleanup
+                                        if (!window.leafletMaps) window.leafletMaps = {};
+                                        window.leafletMaps[mapId] = map;
+
+                                        // Add OpenStreetMap tile layer
+                                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                                            maxZoom: 19
+                                        }).addTo(map);
+
+                                        // Add marker
+                                        L.marker([lat, lon]).addTo(map)
+                                            .bindPopup(newLocation)
+                                            .openPopup();
+
+                                        mapDiv.dataset.initialized = 'true';
+                                    } else {
+                                        mapDiv.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Location not found</div>';
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error geocoding location:', error);
+                                    mapDiv.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error loading map</div>';
+                                });
                         }
 
                         // Update the OpenStreetMap link

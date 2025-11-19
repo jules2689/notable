@@ -101,12 +101,11 @@ enum Component: Equatable {
     }
 
     private func renderMap(location: String) -> String {
-        // OpenStreetMap embed using Nominatim geocoding
+        // Leaflet map with Nominatim geocoding
         let encodedLocation = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? location
 
-        // Using OpenStreetMap export embed
-        // For now, we'll use a simple iframe embed with the location search
-        let osmURL = "https://www.openstreetmap.org/export/embed.html?bbox=-0.004017949104309083%2C51.47612752641776%2C0.00030577182769775396%2C51.478569861898606&layer=mapnik"
+        // Generate a unique ID for this map component
+        let mapId = "map-\(UUID().uuidString)"
 
         return """
         <div class="component-map" style="
@@ -125,15 +124,12 @@ enum Component: Equatable {
             ">
                 📍 \(location)
             </div>
-            <iframe src="\(osmURL)"
-                style="
-                    width: 100%;
-                    height: 300px;
-                    border: none;
-                    display: block;
-                "
-                loading="lazy">
-            </iframe>
+            <div id="\(mapId)" style="
+                width: 100%;
+                height: 300px;
+                background: #f9fafb;
+            ">
+            </div>
             <div style="
                 padding: 4px 8px;
                 background: #f9fafb;
@@ -147,6 +143,50 @@ enum Component: Equatable {
                 </a>
             </div>
         </div>
+        <script data-component-script="true">
+        (function() {
+            const mapId = '\(mapId)';
+            const query = '\(encodedLocation)';
+
+            // Wait for Leaflet to be available
+            if (typeof L === 'undefined') {
+                console.error('Leaflet not loaded');
+                document.getElementById(mapId).innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error: Map library not loaded</div>';
+                return;
+            }
+
+            // Fetch coordinates from Nominatim
+            fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const result = data[0];
+                        const lat = parseFloat(result.lat);
+                        const lon = parseFloat(result.lon);
+
+                        // Initialize the map
+                        const map = L.map(mapId).setView([lat, lon], 13);
+
+                        // Add OpenStreetMap tile layer
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                            maxZoom: 19
+                        }).addTo(map);
+
+                        // Add marker
+                        L.marker([lat, lon]).addTo(map)
+                            .bindPopup('\(location)')
+                            .openPopup();
+                    } else {
+                        document.getElementById(mapId).innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Location not found</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error geocoding location:', error);
+                    document.getElementById(mapId).innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error loading map</div>';
+                });
+        })();
+        </script>
         """
     }
 

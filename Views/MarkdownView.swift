@@ -41,6 +41,12 @@ struct MarkdownView: NSViewRepresentable {
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="color-scheme" content="light dark">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/\(highlightTheme).min.css">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+                crossorigin=""/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+                crossorigin=""></script>
             <style>
                 \(MarkdownRenderer.customCSS(isDarkMode: isDarkMode))
             </style>
@@ -86,6 +92,16 @@ struct MarkdownView: NSViewRepresentable {
                 document.querySelectorAll('pre code').forEach((block) => {
                     hljs.highlightElement(block);
                 });
+
+                // Execute any inline scripts that were added by components
+                // This is necessary because innerHTML doesn't execute script tags
+                setTimeout(() => {
+                    document.querySelectorAll('script[data-component-script]').forEach((oldScript) => {
+                        const newScript = document.createElement('script');
+                        newScript.textContent = oldScript.textContent;
+                        oldScript.parentNode.replaceChild(newScript, oldScript);
+                    });
+                }, 100);
             </script>
         </body>
         </html>
