@@ -6,13 +6,37 @@ struct MarkdownView: NSViewRepresentable {
     let markdown: String
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let configuration = WKWebViewConfiguration()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+
+        // Make background transparent
         webView.setValue(false, forKey: "drawsBackground")
+
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        guard let html = MarkdownRenderer.toHTML(markdown) else {
+        // Handle empty markdown
+        let markdownToRender = markdown.isEmpty ? "_No content yet..._" : markdown
+
+        guard let html = MarkdownRenderer.toHTML(markdownToRender) else {
+            // Fallback if markdown rendering fails
+            let fallbackHTML = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system; padding: 20px; color: #666; }
+                </style>
+            </head>
+            <body>
+                <p>Failed to render markdown</p>
+                <pre>\(markdownToRender.replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;"))</pre>
+            </body>
+            </html>
+            """
+            webView.loadHTMLString(fallbackHTML, baseURL: nil)
             return
         }
 
