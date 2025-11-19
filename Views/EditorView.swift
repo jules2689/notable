@@ -15,6 +15,13 @@ struct EditorView: View {
     @State private var lastSavedContent: String = ""
     @FocusState private var isEditorFocused: Bool
 
+    // Slash command state
+    @State private var showSlashCommands: Bool = false
+    @State private var slashQuery: String = ""
+    @State private var slashCommandPosition: NSPoint = .zero
+    @State private var selectedCommandIndex: Int = 0
+    @State private var commandToInsert: SlashCommand? = nil
+
     var body: some View {
         VStack(spacing: 0) {
             if let note = viewModel.currentNote {
@@ -127,13 +134,64 @@ struct EditorView: View {
     // MARK: - View Modes
 
     private var editView: some View {
-        TextEditor(text: $editedContent)
-            .font(.body)
+        ZStack(alignment: .topLeading) {
+            SlashCommandTextEditor(
+                text: $editedContent,
+                onTextChange: { newText in
+                    scheduleAutoSave()
+                },
+                showSlashCommands: $showSlashCommands,
+                slashQuery: $slashQuery,
+                slashCommandPosition: $slashCommandPosition,
+                commandToInsert: $commandToInsert
+            )
             .focused($isEditorFocused)
-            .padding()
-            .onChange(of: editedContent) { oldValue, newValue in
-                scheduleAutoSave()
+
+            // Slash command popup
+            if showSlashCommands {
+                let filteredCommands = SlashCommand.filtered(by: slashQuery)
+                SlashCommandView(
+                    commands: filteredCommands,
+                    onSelect: { command in
+                        insertSlashCommand(command)
+                    },
+                    onDismiss: {
+                        showSlashCommands = false
+                        selectedCommandIndex = 0
+                    },
+                    selectedIndex: $selectedCommandIndex
+                )
+                .position(x: slashCommandPosition.x + 180, y: slashCommandPosition.y + 150)
+                .onChange(of: slashQuery) { _, _ in
+                    selectedCommandIndex = 0
+                }
             }
+        }
+        .onKeyPress(.downArrow) {
+            guard showSlashCommands else { return .ignored }
+            let commands = SlashCommand.filtered(by: slashQuery)
+            selectedCommandIndex = min(selectedCommandIndex + 1, commands.count - 1)
+            return .handled
+        }
+        .onKeyPress(.upArrow) {
+            guard showSlashCommands else { return .ignored }
+            selectedCommandIndex = max(selectedCommandIndex - 1, 0)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard showSlashCommands else { return .ignored }
+            let commands = SlashCommand.filtered(by: slashQuery)
+            if !commands.isEmpty && selectedCommandIndex < commands.count {
+                insertSlashCommand(commands[selectedCommandIndex])
+            }
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            guard showSlashCommands else { return .ignored }
+            showSlashCommands = false
+            selectedCommandIndex = 0
+            return .handled
+        }
     }
 
     private var previewView: some View {
@@ -145,14 +203,65 @@ struct EditorView: View {
 
     private var splitView: some View {
         HSplitView {
-            TextEditor(text: $editedContent)
-                .font(.body)
+            ZStack(alignment: .topLeading) {
+                SlashCommandTextEditor(
+                    text: $editedContent,
+                    onTextChange: { newText in
+                        scheduleAutoSave()
+                    },
+                    showSlashCommands: $showSlashCommands,
+                    slashQuery: $slashQuery,
+                    slashCommandPosition: $slashCommandPosition,
+                    commandToInsert: $commandToInsert
+                )
                 .focused($isEditorFocused)
-                .padding()
-                .onChange(of: editedContent) { oldValue, newValue in
-                    scheduleAutoSave()
+
+                // Slash command popup
+                if showSlashCommands {
+                    let filteredCommands = SlashCommand.filtered(by: slashQuery)
+                    SlashCommandView(
+                        commands: filteredCommands,
+                        onSelect: { command in
+                            insertSlashCommand(command)
+                        },
+                        onDismiss: {
+                            showSlashCommands = false
+                            selectedCommandIndex = 0
+                        },
+                        selectedIndex: $selectedCommandIndex
+                    )
+                    .position(x: slashCommandPosition.x + 180, y: slashCommandPosition.y + 150)
+                    .onChange(of: slashQuery) { _, _ in
+                        selectedCommandIndex = 0
+                    }
                 }
-                .frame(minWidth: 300)
+            }
+            .onKeyPress(.downArrow) {
+                guard showSlashCommands else { return .ignored }
+                let commands = SlashCommand.filtered(by: slashQuery)
+                selectedCommandIndex = min(selectedCommandIndex + 1, commands.count - 1)
+                return .handled
+            }
+            .onKeyPress(.upArrow) {
+                guard showSlashCommands else { return .ignored }
+                selectedCommandIndex = max(selectedCommandIndex - 1, 0)
+                return .handled
+            }
+            .onKeyPress(.return) {
+                guard showSlashCommands else { return .ignored }
+                let commands = SlashCommand.filtered(by: slashQuery)
+                if !commands.isEmpty && selectedCommandIndex < commands.count {
+                    insertSlashCommand(commands[selectedCommandIndex])
+                }
+                return .handled
+            }
+            .onKeyPress(.escape) {
+                guard showSlashCommands else { return .ignored }
+                showSlashCommands = false
+                selectedCommandIndex = 0
+                return .handled
+            }
+            .frame(minWidth: 300)
 
             MarkdownView(markdown: editedContent)
                 .frame(minWidth: 300)
@@ -191,6 +300,13 @@ struct EditorView: View {
 
         // Update last saved content
         lastSavedContent = editedContent
+    }
+
+    private func insertSlashCommand(_ command: SlashCommand) {
+        // Set the command to insert, which will trigger the coordinator to insert it
+        commandToInsert = command
+        showSlashCommands = false
+        selectedCommandIndex = 0
     }
 }
 

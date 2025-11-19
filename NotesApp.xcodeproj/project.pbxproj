@@ -20,6 +20,11 @@
 		AA0011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0012 /* EditorView.swift */; };
 		AA0012 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0013 /* MarkdownRenderer.swift */; };
 		AA0013 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0014 /* MarkdownView.swift */; };
+		AA0014 /* Component.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0015 /* Component.swift */; };
+		AA0015 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0016 /* SlashCommand.swift */; };
+		AA0016 /* ComponentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0017 /* ComponentParser.swift */; };
+		AA0017 /* SlashCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* SlashCommandView.swift */; };
+		AA0018 /* SlashCommandTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0019 /* SlashCommandTextEditor.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -39,6 +44,11 @@
 		BB0012 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		BB0013 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		BB0014 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
+		BB0015 /* Component.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Component.swift; sourceTree = "<group>"; };
+		BB0016 /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
+		BB0017 /* ComponentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentParser.swift; sourceTree = "<group>"; };
+		BB0018 /* SlashCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandView.swift; sourceTree = "<group>"; };
+		BB0019 /* SlashCommandTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandTextEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +85,8 @@
 				BB0011 /* SidebarView.swift */,
 				BB0012 /* EditorView.swift */,
 				BB0014 /* MarkdownView.swift */,
+				BB0018 /* SlashCommandView.swift */,
+				BB0019 /* SlashCommandTextEditor.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -86,6 +98,8 @@
 				BB0006 /* Folder.swift */,
 				BB0007 /* NoteItem.swift */,
 				BB0008 /* Workspace.swift */,
+				BB0015 /* Component.swift */,
+				BB0016 /* SlashCommand.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -110,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				BB0013 /* MarkdownRenderer.swift */,
+				BB0017 /* ComponentParser.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -210,6 +225,11 @@
 				AA0011 /* EditorView.swift in Sources */,
 				AA0012 /* MarkdownRenderer.swift in Sources */,
 				AA0013 /* MarkdownView.swift in Sources */,
+				AA0014 /* Component.swift in Sources */,
+				AA0015 /* SlashCommand.swift in Sources */,
+				AA0016 /* ComponentParser.swift in Sources */,
+				AA0017 /* SlashCommandView.swift in Sources */,
+				AA0018 /* SlashCommandTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
