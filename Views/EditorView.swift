@@ -194,10 +194,8 @@ struct EditorView: View {
     }
 
     private var previewView: some View {
-        ScrollView {
-            MarkdownView(markdown: editedContent)
-                .frame(maxWidth: .infinity, minHeight: 400)
-        }
+        MarkdownView(markdown: editedContent)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var splitView: some View {
@@ -262,7 +260,7 @@ struct EditorView: View {
             .frame(minWidth: 300)
 
             MarkdownView(markdown: editedContent)
-                .frame(minWidth: 300)
+                .frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
