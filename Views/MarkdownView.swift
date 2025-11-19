@@ -21,35 +21,14 @@ struct MarkdownView: NSViewRepresentable {
         // Handle empty markdown
         let markdownToRender = markdown.isEmpty ? "_No content yet..._" : markdown
 
-        guard let html = MarkdownRenderer.toHTML(markdownToRender) else {
-            // Fallback if markdown rendering fails
-            let fallbackHTML = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="color-scheme" content="light dark">
-                <style>
-                    body {
-                        font-family: -apple-system;
-                        padding: 20px;
-                        color: light-dark(#666, #999);
-                        background: transparent;
-                    }
-                </style>
-            </head>
-            <body>
-                <p>Failed to render markdown</p>
-                <pre>\(markdownToRender.replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;"))</pre>
-            </body>
-            </html>
-            """
-            webView.loadHTMLString(fallbackHTML, baseURL: nil)
-            return
-        }
-
         let isDarkMode = colorScheme == .dark
         let highlightTheme = isDarkMode ? "github-dark" : "github"
+
+        // Escape the markdown for JavaScript
+        let escapedMarkdown = markdownToRender
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
+            .replacingOccurrences(of: "$", with: "\\$")
 
         let styledHTML = """
         <!DOCTYPE html>
@@ -64,9 +43,31 @@ struct MarkdownView: NSViewRepresentable {
             </style>
         </head>
         <body>
-            \(html)
+            <div id="content"></div>
+            <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-            <script>hljs.highlightAll();</script>
+            <script>
+                // Configure marked for GFM
+                marked.setOptions({
+                    gfm: true,
+                    breaks: false,
+                    pedantic: false,
+                    smartLists: true,
+                    smartypants: false,  // Disable smart quotes
+                    highlight: function(code, lang) {
+                        if (lang && hljs.getLanguage(lang)) {
+                            try {
+                                return hljs.highlight(code, { language: lang }).value;
+                            } catch (e) {}
+                        }
+                        return hljs.highlightAuto(code).value;
+                    }
+                });
+
+                // Render markdown
+                const markdown = `\(escapedMarkdown)`;
+                document.getElementById('content').innerHTML = marked.parse(markdown);
+            </script>
         </body>
         </html>
         """
