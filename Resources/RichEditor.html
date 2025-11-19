@@ -316,7 +316,8 @@
         }
 
         // Handle input changes
-        editor.addEventListener('input', () => {
+        editor.addEventListener('input', (e) => {
+            handleMarkdownConversion(e);
             notifyChange();
             handleSlashCommand();
         });
@@ -336,6 +337,186 @@
                     markdown: getMarkdown()
                 });
             }
+        }
+
+        // Handle markdown conversion as you type
+        function handleMarkdownConversion(e) {
+            // Skip on delete/backspace
+            if (e.inputType && (e.inputType.includes('delete') || e.inputType.includes('cut'))) {
+                return;
+            }
+
+            // Use setTimeout to let the DOM update first
+            setTimeout(() => {
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
+
+                const range = selection.getRangeAt(0);
+                let node = range.startContainer;
+
+                // Get the parent element
+                if (node.nodeType === Node.TEXT_NODE) {
+                    node = node.parentElement;
+                }
+
+                // Must be inside the editor
+                if (!node || !editor.contains(node)) return;
+
+                // Don't convert inside code blocks, pre tags, or already formatted elements
+                if (node.closest('pre, code, strong, em, h1, h2, h3, h4, h5, h6')) return;
+
+                const textContent = node.textContent || '';
+
+                // Headings: ## text (requires space after ##)
+                const headingMatch = textContent.match(/^(#{1,6})\s+(.+)$/);
+                if (headingMatch) {
+                    const level = headingMatch[1].length;
+                    const content = headingMatch[2];
+                    const heading = document.createElement('h' + level);
+                    heading.textContent = content;
+                    node.replaceWith(heading);
+                    placeCursorAtEnd(heading);
+                    return;
+                }
+
+                // Bold: **text** followed by space
+                const boldMatch = textContent.match(/^(.*?)\*\*([^*]+)\*\*\s/);
+                if (boldMatch) {
+                    const before = boldMatch[1];
+                    const boldText = boldMatch[2];
+                    const after = textContent.substring(boldMatch[0].length);
+
+                    const wrapper = document.createElement('div');
+                    if (before) wrapper.appendChild(document.createTextNode(before));
+                    const strong = document.createElement('strong');
+                    strong.textContent = boldText;
+                    wrapper.appendChild(strong);
+                    wrapper.appendChild(document.createTextNode(' ' + after));
+
+                    node.replaceWith(...wrapper.childNodes);
+                    placeCursorAfter(strong, 1);
+                    return;
+                }
+
+                // Italic: *text* or _text_ followed by space (but not bold)
+                const italicMatch = textContent.match(/^(.*?)([*_])([^*_]+)\2\s/);
+                if (italicMatch && !textContent.includes('**')) {
+                    const before = italicMatch[1];
+                    const italicText = italicMatch[3];
+                    const after = textContent.substring(italicMatch[0].length);
+
+                    const wrapper = document.createElement('div');
+                    if (before) wrapper.appendChild(document.createTextNode(before));
+                    const em = document.createElement('em');
+                    em.textContent = italicText;
+                    wrapper.appendChild(em);
+                    wrapper.appendChild(document.createTextNode(' ' + after));
+
+                    node.replaceWith(...wrapper.childNodes);
+                    placeCursorAfter(em, 1);
+                    return;
+                }
+
+                // Inline code: `code` followed by space
+                const codeMatch = textContent.match(/^(.*?)`([^`]+)`\s/);
+                if (codeMatch) {
+                    const before = codeMatch[1];
+                    const codeText = codeMatch[2];
+                    const after = textContent.substring(codeMatch[0].length);
+
+                    const wrapper = document.createElement('div');
+                    if (before) wrapper.appendChild(document.createTextNode(before));
+                    const code = document.createElement('code');
+                    code.textContent = codeText;
+                    wrapper.appendChild(code);
+                    wrapper.appendChild(document.createTextNode(' ' + after));
+
+                    node.replaceWith(...wrapper.childNodes);
+                    placeCursorAfter(code, 1);
+                    return;
+                }
+
+                // Unordered list: - item or * item
+                const listMatch = textContent.match(/^[-*]\s+(.+)$/);
+                if (listMatch && !textContent.match(/^-\s+\[[ xX]\]/)) {
+                    const content = listMatch[1];
+                    const ul = document.createElement('ul');
+                    const li = document.createElement('li');
+                    li.textContent = content;
+                    ul.appendChild(li);
+                    node.replaceWith(ul);
+                    placeCursorAtEnd(li);
+                    return;
+                }
+
+                // Task list: - [ ] or - [x]
+                const taskMatch = textContent.match(/^-\s+\[([ xX])\]\s+(.+)$/);
+                if (taskMatch) {
+                    const checked = taskMatch[1].toLowerCase() === 'x';
+                    const content = taskMatch[2];
+                    const ul = document.createElement('ul');
+                    ul.className = 'task-list';
+                    const li = document.createElement('li');
+                    if (checked) li.className = 'checked';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = checked;
+                    li.appendChild(checkbox);
+                    li.appendChild(document.createTextNode(' ' + content));
+                    ul.appendChild(li);
+                    node.replaceWith(ul);
+                    placeCursorAtEnd(li);
+                    return;
+                }
+
+                // Blockquote: > text
+                const quoteMatch = textContent.match(/^>\s+(.+)$/);
+                if (quoteMatch) {
+                    const content = quoteMatch[1];
+                    const blockquote = document.createElement('blockquote');
+                    blockquote.textContent = content;
+                    node.replaceWith(blockquote);
+                    placeCursorAtEnd(blockquote);
+                    return;
+                }
+
+                // Code block: ``` (three backticks)
+                const codeBlockMatch = textContent.match(/^```\s*(\w*)$/);
+                if (codeBlockMatch) {
+                    const pre = document.createElement('pre');
+                    const code = document.createElement('code');
+                    code.textContent = '\n';
+                    pre.appendChild(code);
+                    node.replaceWith(pre);
+                    placeCursorAtEnd(code);
+                    return;
+                }
+            }, 0);
+        }
+
+        // Helper: place cursor at end of element
+        function placeCursorAtEnd(element) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        // Helper: place cursor after element with offset
+        function placeCursorAfter(element, offset) {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            if (element.nextSibling && element.nextSibling.nodeType === Node.TEXT_NODE) {
+                range.setStart(element.nextSibling, offset);
+                range.collapse(true);
+            } else {
+                range.setStartAfter(element);
+                range.collapse(true);
+            }
+            selection.removeAllRanges();
+            selection.addRange(range);
         }
 
         // Handle slash commands
