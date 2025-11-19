@@ -13,13 +13,6 @@ struct ContentView: View {
             EditorView(viewModel: viewModel)
                 .navigationSplitViewColumnWidth(min: 400, ideal: 800)
         }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: toggleSidebar) {
-                    Label("Toggle Sidebar", systemImage: "sidebar.left")
-                }
-            }
-        }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.errorMessage = nil
@@ -28,12 +21,6 @@ struct ContentView: View {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
             }
-        }
-    }
-
-    private func toggleSidebar() {
-        withAnimation {
-            columnVisibility = columnVisibility == .all ? .detailOnly : .all
         }
     }
 }

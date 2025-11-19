@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA0001 /* NotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001 /* NotesApp.swift */; };
+		AA0001 /* Notable.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001 /* Notable.swift */; };
 		AA0002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0002 /* ContentView.swift */; };
 		AA0003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB0003 /* Assets.xcassets */; };
 		AA0004 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0005 /* Note.swift */; };
@@ -30,7 +30,7 @@
 
 /* Begin PBXFileReference section */
 		CC0001 /* NotesApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotesApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		BB0001 /* NotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesApp.swift; sourceTree = "<group>"; };
+		BB0001 /* Notable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notable.swift; sourceTree = "<group>"; };
 		BB0002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB0003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB0004 /* NotesApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NotesApp.entitlements; sourceTree = "<group>"; };
@@ -66,7 +66,7 @@
 		EE0001 = {
 			isa = PBXGroup;
 			children = (
-				BB0001 /* NotesApp.swift */,
+				BB0001 /* Notable.swift */,
 				FF0001 /* Views */,
 				FF0002 /* Models */,
 				FF0003 /* ViewModels */,
@@ -214,7 +214,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0002 /* ContentView.swift in Sources */,
-				AA0001 /* NotesApp.swift in Sources */,
+				AA0001 /* Notable.swift in Sources */,
 				AA0004 /* Note.swift in Sources */,
 				AA0005 /* Folder.swift in Sources */,
 				AA0006 /* NoteItem.swift in Sources */,
@@ -367,7 +367,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = NotesApp;
+				INFOPLIST_KEY_CFBundleDisplayName = Notable;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -395,7 +395,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = NotesApp;
+				INFOPLIST_KEY_CFBundleDisplayName = Notable;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
