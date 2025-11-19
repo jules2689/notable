@@ -15,6 +15,9 @@
 		AA0006 /* NoteItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0007 /* NoteItem.swift */; };
 		AA0007 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0008 /* Workspace.swift */; };
 		AA0008 /* FileSystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0009 /* FileSystemService.swift */; };
+		AA0009 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0010 /* NotesViewModel.swift */; };
+		AA0010 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0011 /* SidebarView.swift */; };
+		AA0011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0012 /* EditorView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +31,9 @@
 		BB0007 /* NoteItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteItem.swift; sourceTree = "<group>"; };
 		BB0008 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		BB0009 /* FileSystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemService.swift; sourceTree = "<group>"; };
+		BB0010 /* NotesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesViewModel.swift; sourceTree = "<group>"; };
+		BB0011 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		BB0012 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +66,8 @@
 			isa = PBXGroup;
 			children = (
 				BB0002 /* ContentView.swift */,
+				BB0011 /* SidebarView.swift */,
+				BB0012 /* EditorView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -78,6 +86,7 @@
 		FF0003 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				BB0010 /* NotesViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -182,6 +191,9 @@
 				AA0006 /* NoteItem.swift in Sources */,
 				AA0007 /* Workspace.swift in Sources */,
 				AA0008 /* FileSystemService.swift in Sources */,
+				AA0009 /* NotesViewModel.swift in Sources */,
+				AA0010 /* SidebarView.swift in Sources */,
+				AA0011 /* EditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
