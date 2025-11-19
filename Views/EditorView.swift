@@ -134,19 +134,18 @@ struct EditorView: View {
     // MARK: - View Modes
 
     private var editView: some View {
-        ZStack(alignment: .topLeading) {
-            SlashCommandTextEditor(
-                text: $editedContent,
-                onTextChange: { newText in
-                    scheduleAutoSave()
-                },
-                showSlashCommands: $showSlashCommands,
-                slashQuery: $slashQuery,
-                slashCommandPosition: $slashCommandPosition,
-                commandToInsert: $commandToInsert
-            )
-            .focused($isEditorFocused)
-
+        SlashCommandTextEditor(
+            text: $editedContent,
+            onTextChange: { newText in
+                scheduleAutoSave()
+            },
+            showSlashCommands: $showSlashCommands,
+            slashQuery: $slashQuery,
+            slashCommandPosition: $slashCommandPosition,
+            commandToInsert: $commandToInsert
+        )
+        .focused($isEditorFocused)
+        .overlay(alignment: .topLeading) {
             // Slash command popup
             if showSlashCommands {
                 let filteredCommands = SlashCommand.filtered(by: slashQuery)
@@ -161,7 +160,7 @@ struct EditorView: View {
                     },
                     selectedIndex: $selectedCommandIndex
                 )
-                .position(x: slashCommandPosition.x + 180, y: slashCommandPosition.y + 150)
+                .offset(x: slashCommandPosition.x, y: slashCommandPosition.y)
                 .onChange(of: slashQuery) { _, _ in
                     selectedCommandIndex = 0
                 }
@@ -203,19 +202,18 @@ struct EditorView: View {
 
     private var splitView: some View {
         HSplitView {
-            ZStack(alignment: .topLeading) {
-                SlashCommandTextEditor(
-                    text: $editedContent,
-                    onTextChange: { newText in
-                        scheduleAutoSave()
-                    },
-                    showSlashCommands: $showSlashCommands,
-                    slashQuery: $slashQuery,
-                    slashCommandPosition: $slashCommandPosition,
-                    commandToInsert: $commandToInsert
-                )
-                .focused($isEditorFocused)
-
+            SlashCommandTextEditor(
+                text: $editedContent,
+                onTextChange: { newText in
+                    scheduleAutoSave()
+                },
+                showSlashCommands: $showSlashCommands,
+                slashQuery: $slashQuery,
+                slashCommandPosition: $slashCommandPosition,
+                commandToInsert: $commandToInsert
+            )
+            .focused($isEditorFocused)
+            .overlay(alignment: .topLeading) {
                 // Slash command popup
                 if showSlashCommands {
                     let filteredCommands = SlashCommand.filtered(by: slashQuery)
@@ -230,7 +228,7 @@ struct EditorView: View {
                         },
                         selectedIndex: $selectedCommandIndex
                     )
-                    .position(x: slashCommandPosition.x + 180, y: slashCommandPosition.y + 150)
+                    .offset(x: slashCommandPosition.x, y: slashCommandPosition.y)
                     .onChange(of: slashQuery) { _, _ in
                         selectedCommandIndex = 0
                     }

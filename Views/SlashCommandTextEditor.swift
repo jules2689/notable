@@ -132,11 +132,19 @@ struct SlashCommandTextEditor: NSViewRepresentable {
                             let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: absoluteSlashLocation, length: 1), actualCharacterRange: nil)
                             let glyphRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
 
-                            // Convert to screen coordinates
-                            var position = textView.convert(glyphRect.origin, to: nil)
-                            position.y += glyphRect.height + 4
+                            // Convert to text view coordinates
+                            var rectInTextView = glyphRect
+                            rectInTextView.origin.x += textContainer.lineFragmentPadding
+                            rectInTextView.origin.y += textView.textContainerInset.height
 
-                            slashCommandPosition?.wrappedValue = position
+                            // Convert to scroll view coordinates (the parent of textView)
+                            if let scrollView = textView.enclosingScrollView {
+                                let rectInScrollView = textView.convert(rectInTextView, to: scrollView)
+
+                                // Store the position (bottom-left of the character)
+                                let position = NSPoint(x: rectInScrollView.minX, y: rectInScrollView.maxY + 4)
+                                slashCommandPosition?.wrappedValue = position
+                            }
                         }
 
                         showSlashCommands?.wrappedValue = true
