@@ -14,6 +14,7 @@
 		AA0005 /* Folder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0006 /* Folder.swift */; };
 		AA0006 /* NoteItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0007 /* NoteItem.swift */; };
 		AA0007 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0008 /* Workspace.swift */; };
+		AA0008 /* FileSystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0009 /* FileSystemService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		BB0006 /* Folder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder.swift; sourceTree = "<group>"; };
 		BB0007 /* NoteItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteItem.swift; sourceTree = "<group>"; };
 		BB0008 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
+		BB0009 /* FileSystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +85,7 @@
 		FF0004 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				BB0009 /* FileSystemService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -178,6 +181,7 @@
 				AA0005 /* Folder.swift in Sources */,
 				AA0006 /* NoteItem.swift in Sources */,
 				AA0007 /* Workspace.swift in Sources */,
+				AA0008 /* FileSystemService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
