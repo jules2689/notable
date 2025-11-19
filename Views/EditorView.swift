@@ -1,8 +1,15 @@
 import SwiftUI
 
+enum EditorMode: String, CaseIterable {
+    case edit = "Edit"
+    case preview = "Preview"
+    case split = "Split"
+}
+
 struct EditorView: View {
     var viewModel: NotesViewModel
     @State private var editedContent: String = ""
+    @State private var editorMode: EditorMode = .edit
     @FocusState private var isEditorFocused: Bool
 
     var body: some View {
@@ -22,6 +29,16 @@ struct EditorView: View {
 
                     Spacer()
 
+                    // Mode picker
+                    Picker("View Mode", selection: $editorMode) {
+                        ForEach(EditorMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                    .padding(.trailing)
+
                     // Save indicator
                     if editedContent != note.content {
                         Text("Unsaved")
@@ -34,25 +51,24 @@ struct EditorView: View {
 
                 Divider()
 
-                // Editor
-                TextEditor(text: $editedContent)
-                    .font(.body)
-                    .focused($isEditorFocused)
-                    .padding()
-                    .onChange(of: editedContent) { oldValue, newValue in
-                        // Auto-save with debounce would go here
-                        if var updatedNote = viewModel.currentNote {
-                            updatedNote.content = newValue
-                            viewModel.currentNote = updatedNote
-                        }
+                // Content area based on mode
+                Group {
+                    switch editorMode {
+                    case .edit:
+                        editView
+                    case .preview:
+                        previewView
+                    case .split:
+                        splitView
                     }
-                    .onAppear {
-                        editedContent = note.content
-                        isEditorFocused = true
-                    }
-                    .onChange(of: note.id) { _, _ in
-                        editedContent = note.content
-                    }
+                }
+                .onAppear {
+                    editedContent = note.content
+                    isEditorFocused = true
+                }
+                .onChange(of: note.id) { _, _ in
+                    editedContent = note.content
+                }
             } else {
                 // Empty state
                 VStack(spacing: 16) {
@@ -85,6 +101,49 @@ struct EditorView: View {
             }
         }
     }
+
+    // MARK: - View Modes
+
+    private var editView: some View {
+        TextEditor(text: $editedContent)
+            .font(.body)
+            .focused($isEditorFocused)
+            .padding()
+            .onChange(of: editedContent) { oldValue, newValue in
+                if var updatedNote = viewModel.currentNote {
+                    updatedNote.content = newValue
+                    viewModel.currentNote = updatedNote
+                }
+            }
+    }
+
+    private var previewView: some View {
+        ScrollView {
+            MarkdownView(markdown: editedContent)
+                .frame(maxWidth: .infinity, minHeight: 400)
+        }
+    }
+
+    private var splitView: some View {
+        HSplitView {
+            TextEditor(text: $editedContent)
+                .font(.body)
+                .focused($isEditorFocused)
+                .padding()
+                .onChange(of: editedContent) { oldValue, newValue in
+                    if var updatedNote = viewModel.currentNote {
+                        updatedNote.content = newValue
+                        viewModel.currentNote = updatedNote
+                    }
+                }
+                .frame(minWidth: 300)
+
+            MarkdownView(markdown: editedContent)
+                .frame(minWidth: 300)
+        }
+    }
+
+    // MARK: - Actions
 
     private func saveNote() {
         if var note = viewModel.currentNote {
