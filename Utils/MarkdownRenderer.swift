@@ -27,28 +27,8 @@ class MarkdownRenderer {
         }
     }
 
-    /// Renders markdown to styled NSAttributedString with custom options
-    static func toStyledAttributedString(_ markdown: String, fontSize: CGFloat = 14) -> NSAttributedString? {
-        do {
-            let down = Down(markdownString: markdown)
-
-            // Configure styling options
-            var options = DownOptions()
-            options.insert(.smartQuotes)
-            options.insert(.githubPreLang)
-
-            let styler = DownStyler()
-            styler.baseFontSize = fontSize
-
-            return try down.toAttributedString(.default, stylesheet: customCSS(fontSize: fontSize))
-        } catch {
-            print("Markdown styling failed: \(error)")
-            return toAttributedString(markdown)
-        }
-    }
-
     /// Custom CSS for styling markdown content
-    private static func customCSS(fontSize: CGFloat) -> String {
+    static func customCSS(fontSize: CGFloat = 14) -> String {
         """
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
