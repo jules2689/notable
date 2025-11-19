@@ -118,6 +118,9 @@ struct SearchBar: View {
 struct NoteItemRow: View {
     let item: NoteItem
     var viewModel: NotesViewModel
+    @State private var showingRenameAlert = false
+    @State private var showingDeleteAlert = false
+    @State private var newName = ""
 
     var body: some View {
         HStack {
@@ -132,6 +135,66 @@ struct NoteItemRow: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .contextMenu {
+            if item.isNote {
+                Button {
+                    newName = item.name
+                    showingRenameAlert = true
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    showingDeleteAlert = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            } else if item.isFolder {
+                Button {
+                    newName = item.name
+                    showingRenameAlert = true
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    showingDeleteAlert = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+        .alert("Rename \(item.isFolder ? "Folder" : "Note")", isPresented: $showingRenameAlert) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                if item.isNote, case .note(let note) = item {
+                    viewModel.renameNote(note, to: newName)
+                } else if item.isFolder, case .folder(let folder) = item {
+                    viewModel.renameFolder(folder, to: newName)
+                }
+            }
+        }
+        .alert("Delete \(item.isFolder ? "Folder" : "Note")?", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if item.isNote, case .note(let note) = item {
+                    viewModel.deleteNote(note)
+                } else if item.isFolder, case .folder(let folder) = item {
+                    viewModel.deleteFolder(folder)
+                }
+            }
+        } message: {
+            if item.isFolder {
+                Text("This will permanently delete the folder and all its contents.")
+            } else {
+                Text("This will permanently delete this note.")
+            }
+        }
     }
 }
 
