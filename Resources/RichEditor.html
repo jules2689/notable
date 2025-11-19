@@ -509,6 +509,72 @@
             });
         }
 
+        // Initialize iframes after they're in the DOM
+        function initializeIframes() {
+            editor.querySelectorAll('.iframe-container[data-url]').forEach(container => {
+                const iframe = container.querySelector('iframe');
+                if (!iframe || iframe.dataset.initialized === 'true') return;
+
+                const url = container.getAttribute('data-url');
+                if (url && url.trim()) {
+                    // Mark as initialized
+                    iframe.dataset.initialized = 'true';
+                    // Ensure iframe src is set (should already be set, but ensure it's correct)
+                    if (iframe.src !== url) {
+                        iframe.src = url;
+                    }
+                }
+            });
+        }
+
+        // Initialize Leaflet maps after they're in the DOM
+        function initializeMaps() {
+            editor.querySelectorAll('.map-container[data-map-id]').forEach(container => {
+                const mapId = container.getAttribute('data-map-id');
+                const mapElement = document.getElementById(mapId);
+                if (!mapElement || mapElement.dataset.initialized === 'true') return;
+
+                mapElement.dataset.initialized = 'true';
+                const encodedLocation = container.getAttribute('data-encoded-location');
+                const trimmedLocation = container.querySelector('.component-location')?.textContent.trim() || '';
+
+                // Fetch coordinates from Nominatim
+                fetch(`https://nominatim.openstreetmap.org/search?q=${encodedLocation}&format=json&limit=1`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            const result = data[0];
+                            const lat = parseFloat(result.lat);
+                            const lon = parseFloat(result.lon);
+
+                            // Initialize the map
+                            const map = L.map(mapId).setView([lat, lon], 13);
+
+                            // Store map instance for later cleanup
+                            if (!window.leafletMaps) window.leafletMaps = {};
+                            window.leafletMaps[mapId] = map;
+
+                            // Add OpenStreetMap tile layer
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                                maxZoom: 19
+                            }).addTo(map);
+
+                            // Add marker
+                            L.marker([lat, lon]).addTo(map)
+                                .bindPopup(trimmedLocation)
+                                .openPopup();
+                        } else {
+                            mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Location not found</div>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error geocoding location:', error);
+                        mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error loading map</div>';
+                    });
+            });
+        }
+
         // Initialize editor with markdown content
         function setContent(markdown) {
             // Parse custom components BEFORE marked processes the markdown
@@ -563,6 +629,12 @@
                 }
             });
 
+            // Initialize iframes and maps after HTML is in the DOM
+            setTimeout(() => {
+                initializeIframes();
+                initializeMaps();
+            }, 100);
+
             applySyntaxHighlighting();
             // Don't call notifyChange() here - this is initial content load, not a user edit
         }
@@ -609,50 +681,9 @@
                 const encodedLocation = encodeURIComponent(trimmedLocation);
                 const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
 
-                // Initialize Leaflet map after DOM is ready
-                setTimeout(() => {
-                    const mapElement = document.getElementById(mapId);
-                    if (!mapElement || mapElement.dataset.initialized === 'true') return;
-
-                    mapElement.dataset.initialized = 'true';
-
-                    // Fetch coordinates from Nominatim
-                    fetch(`https://nominatim.openstreetmap.org/search?q=${encodedLocation}&format=json&limit=1`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data && data.length > 0) {
-                                const result = data[0];
-                                const lat = parseFloat(result.lat);
-                                const lon = parseFloat(result.lon);
-
-                                // Initialize the map
-                                const map = L.map(mapId).setView([lat, lon], 13);
-
-                                // Store map instance for later cleanup
-                                if (!window.leafletMaps) window.leafletMaps = {};
-                                window.leafletMaps[mapId] = map;
-
-                                // Add OpenStreetMap tile layer
-                                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                                    maxZoom: 19
-                                }).addTo(map);
-
-                                // Add marker
-                                L.marker([lat, lon]).addTo(map)
-                                    .bindPopup(trimmedLocation)
-                                    .openPopup();
-                            } else {
-                                mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Location not found</div>';
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error geocoding location:', error);
-                            mapElement.innerHTML = '<div style="color: #ef4444; display: flex; align-items: center; justify-content: center; height: 100%;">Error loading map</div>';
-                        });
-                }, 100);
-
-                return `<div class="map-container component-wrapper" contenteditable="false" data-component="map" data-location="${escapedLocation}">
+                // Don't initialize map here - it will be initialized after HTML is inserted into DOM
+                // Store the location data in a data attribute for later initialization
+                return `<div class="map-container component-wrapper" contenteditable="false" data-component="map" data-location="${escapedLocation}" data-map-id="${mapId}" data-encoded-location="${encodedLocation}">
                     <div class="component-header" style="padding: 6px 12px; background: var(--code-bg); border-bottom: 1px solid var(--border-color); font-size: 12px; display: flex; align-items: center; gap: 8px;">
                         <span style="color: var(--secondary-color);">📍 Map:</span>
                         <span class="component-location" contenteditable="true" style="flex: 1; padding: 2px 6px; background: var(--bg-color); border-radius: 3px; outline: none;">${trimmedLocation}</span>
@@ -705,12 +736,40 @@
 
             // Convert custom components back to {% %} syntax using data attributes
             // Need to unescape the HTML entities from the attributes
+            
+            // Callouts: simple pattern
             html = html.replace(/<div class="callout (\w+)">([^<]+)<\/div>/g, '{% callout $1 | $2 %}');
-            html = html.replace(/<div[^>]*class="[^"]*iframe-container[^"]*"[^>]*data-url="([^"]*)"[^>]*>[\s\S]*?<\/div>/g, (match, url) => {
-                return `{% iframe ${unescapeHtml(url)} %}`;
+            
+            // Iframes: match the full container structure (more flexible regex to handle attribute order)
+            // Match divs with iframe-container class and data-url attribute
+            html = html.replace(/<div[^>]*class="[^"]*iframe-container[^"]*"[^>]*>[\s\S]*?<\/div>/g, (match) => {
+                // Extract data-url from the match
+                const urlMatch = match.match(/data-url="([^"]*)"/);
+                if (urlMatch && urlMatch[1]) {
+                    return `{% iframe ${unescapeHtml(urlMatch[1])} %}`;
+                }
+                // Fallback: try to get URL from the editable span
+                const urlSpanMatch = match.match(/<span[^>]*class="[^"]*component-url[^"]*"[^>]*>([^<]+)<\/span>/);
+                if (urlSpanMatch && urlSpanMatch[1]) {
+                    return `{% iframe ${urlSpanMatch[1].trim()} %}`;
+                }
+                return match; // Return original if we can't parse it
             });
-            html = html.replace(/<div[^>]*class="[^"]*map-container[^"]*"[^>]*data-location="([^"]*)"[^>]*>[\s\S]*?<\/div>/g, (match, location) => {
-                return `{% map ${unescapeHtml(location)} %}`;
+            
+            // Maps: match the full container structure (more flexible regex to handle attribute order)
+            // Match divs with map-container class and data-location attribute
+            html = html.replace(/<div[^>]*class="[^"]*map-container[^"]*"[^>]*>[\s\S]*?<\/div>/g, (match) => {
+                // Extract data-location from the match
+                const locationMatch = match.match(/data-location="([^"]*)"/);
+                if (locationMatch && locationMatch[1]) {
+                    return `{% map ${unescapeHtml(locationMatch[1])} %}`;
+                }
+                // Fallback: try to get location from the editable span
+                const locationSpanMatch = match.match(/<span[^>]*class="[^"]*component-location[^"]*"[^>]*>([^<]+)<\/span>/);
+                if (locationSpanMatch && locationSpanMatch[1]) {
+                    return `{% map ${locationSpanMatch[1].trim()} %}`;
+                }
+                return match; // Return original if we can't parse it
             });
 
             // Convert task list checkboxes
@@ -766,6 +825,7 @@
                     if (iframe && newURL) {
                         iframe.src = newURL;
                         container.setAttribute('data-url', newURL);
+                        notifyChange(); // Notify that content has changed
                     }
                 }
                 return; // Don't process other handlers for component edits
@@ -839,6 +899,7 @@
                             link.href = `https://www.openstreetmap.org/search?query=${encoded}`;
                         }
                     }
+                    notifyChange(); // Notify that content has changed
                 }
                 return; // Don't process other handlers for component edits
             }
