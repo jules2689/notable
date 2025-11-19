@@ -218,11 +218,42 @@
             font-size: 12px;
             color: var(--secondary-color);
         }
+
+        /* Block exit hint tooltip */
+        #block-hint {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--secondary-color);
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            z-index: 999;
+        }
+        #block-hint.show {
+            display: block;
+            opacity: 0.8;
+        }
+        #block-hint kbd {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
     <div id="editor" contenteditable="true"></div>
     <div id="slash-menu"></div>
+    <div id="block-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> to exit block</div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
@@ -253,6 +284,7 @@
 
         const editor = document.getElementById('editor');
         const slashMenu = document.getElementById('slash-menu');
+        const blockHint = document.getElementById('block-hint');
 
         let slashMenuVisible = false;
         let slashMenuItems = [];
@@ -618,23 +650,86 @@
             notifyChange();
         }
 
-        // Keyboard navigation for slash menu
+        // Keyboard navigation for slash menu and block exit
         document.addEventListener('keydown', (e) => {
-            if (!slashMenuVisible) return;
+            // Handle slash menu navigation
+            if (slashMenuVisible) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedItemIndex = Math.min(selectedItemIndex + 1, slashMenuItems.length - 1);
+                    updateMenuSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedItemIndex = Math.max(selectedItemIndex - 1, 0);
+                    updateMenuSelection();
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    insertSlashCommand(selectedItemIndex);
+                } else if (e.key === 'Escape') {
+                    hideSlashMenu();
+                }
+                return;
+            }
 
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                selectedItemIndex = Math.min(selectedItemIndex + 1, slashMenuItems.length - 1);
-                updateMenuSelection();
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                selectedItemIndex = Math.max(selectedItemIndex - 1, 0);
-                updateMenuSelection();
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                insertSlashCommand(selectedItemIndex);
-            } else if (e.key === 'Escape') {
-                hideSlashMenu();
+            // Handle Enter key in special blocks
+            if (e.key === 'Enter') {
+                const selection = window.getSelection();
+                if (!selection.rangeCount) return;
+
+                const range = selection.getRangeAt(0);
+                let node = range.startContainer;
+
+                // Walk up the tree to find the parent element
+                while (node && node.nodeType === Node.TEXT_NODE) {
+                    node = node.parentNode;
+                }
+
+                // Check if we're in a special block (walk up to be sure)
+                let specialBlock = null;
+                let current = node;
+                while (current && current !== editor) {
+                    if (current.matches && current.matches('pre, blockquote, .callout, .iframe-container, .map-container')) {
+                        specialBlock = current;
+                        break;
+                    }
+                    current = current.parentElement;
+                }
+
+                if (specialBlock) {
+                    e.preventDefault();
+
+                    if (e.shiftKey) {
+                        // Shift+Enter: Exit the block
+                        const newP = document.createElement('p');
+                        newP.innerHTML = '<br>'; // Empty paragraph with line break
+                        specialBlock.insertAdjacentElement('afterend', newP);
+
+                        // Move cursor to the new paragraph
+                        const newRange = document.createRange();
+                        newRange.setStart(newP, 0);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+
+                        notifyChange();
+                        updateBlockHint();
+                    } else {
+                        // Regular Enter: Insert line break inside the block
+                        range.deleteContents();
+
+                        // Insert a line break
+                        const br = document.createElement('br');
+                        range.insertNode(br);
+
+                        // Move cursor after the line break
+                        range.setStartAfter(br);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+
+                        notifyChange();
+                    }
+                }
             }
         });
 
@@ -643,6 +738,38 @@
                 item.classList.toggle('selected', index === selectedItemIndex);
             });
         }
+
+        // Update block hint visibility based on cursor position
+        function updateBlockHint() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) {
+                blockHint.classList.remove('show');
+                return;
+            }
+
+            let node = selection.getRangeAt(0).startContainer;
+            if (node.nodeType === Node.TEXT_NODE) {
+                node = node.parentElement;
+            }
+
+            // Check if cursor is in a special block
+            const specialBlock = node.closest('pre, blockquote, .callout, .iframe-container, .map-container');
+            if (specialBlock) {
+                blockHint.classList.add('show');
+            } else {
+                blockHint.classList.remove('show');
+            }
+        }
+
+        // Listen for selection changes to update hint
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement === editor || editor.contains(document.activeElement)) {
+                updateBlockHint();
+            }
+        });
+
+        // Also update on click
+        editor.addEventListener('click', updateBlockHint);
 
         // Expose functions to Swift
         window.setContent = setContent;
