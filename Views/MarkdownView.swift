@@ -1,9 +1,11 @@
 import SwiftUI
 import WebKit
+import AppKit
 
 /// A view that renders markdown content as HTML using WebKit
 struct MarkdownView: NSViewRepresentable {
     let markdown: String
+    @Environment(\.colorScheme) var colorScheme
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -26,8 +28,14 @@ struct MarkdownView: NSViewRepresentable {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="color-scheme" content="light dark">
                 <style>
-                    body { font-family: -apple-system; padding: 20px; color: #666; }
+                    body {
+                        font-family: -apple-system;
+                        padding: 20px;
+                        color: light-dark(#666, #999);
+                        background: transparent;
+                    }
                 </style>
             </head>
             <body>
@@ -40,14 +48,16 @@ struct MarkdownView: NSViewRepresentable {
             return
         }
 
+        let isDarkMode = colorScheme == .dark
         let styledHTML = """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="color-scheme" content="light dark">
             <style>
-                \(MarkdownRenderer.customCSS())
+                \(MarkdownRenderer.customCSS(isDarkMode: isDarkMode))
             </style>
         </head>
         <body>
@@ -61,15 +71,25 @@ struct MarkdownView: NSViewRepresentable {
 }
 
 extension MarkdownRenderer {
-    /// Public CSS accessor for MarkdownView
-    static func customCSS() -> String {
-        """
+    /// Public CSS accessor for MarkdownView with theme support
+    static func customCSS(isDarkMode: Bool = false) -> String {
+        let textColor = isDarkMode ? "#e8e8e8" : "#1d1d1f"
+        let secondaryTextColor = isDarkMode ? "#a0a0a0" : "#6e6e73"
+        let borderColor = isDarkMode ? "#3a3a3a" : "#e5e5e5"
+        let codeBackground = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(175, 184, 193, 0.2)"
+        let preBackground = isDarkMode ? "#2a2a2a" : "#f6f8fa"
+        let tableHeaderBackground = isDarkMode ? "#2a2a2a" : "#f6f8fa"
+        let tableRowBackground = isDarkMode ? "#252525" : "#f6f8fa"
+        let linkColor = isDarkMode ? "#4a9eff" : "#007aff"
+
+        return """
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
             font-size: 14px;
             line-height: 1.6;
-            color: #1d1d1f;
+            color: \(textColor);
             padding: 20px;
+            background: transparent;
         }
 
         h1, h2, h3, h4, h5, h6 {
@@ -77,22 +97,24 @@ extension MarkdownRenderer {
             margin-bottom: 16px;
             font-weight: 600;
             line-height: 1.25;
+            color: \(textColor);
         }
 
-        h1 { font-size: 2em; border-bottom: 1px solid #e5e5e5; padding-bottom: 0.3em; }
-        h2 { font-size: 1.5em; border-bottom: 1px solid #e5e5e5; padding-bottom: 0.3em; }
+        h1 { font-size: 2em; border-bottom: 1px solid \(borderColor); padding-bottom: 0.3em; }
+        h2 { font-size: 1.5em; border-bottom: 1px solid \(borderColor); padding-bottom: 0.3em; }
         h3 { font-size: 1.25em; }
         h4 { font-size: 1em; }
         h5 { font-size: 0.875em; }
-        h6 { font-size: 0.85em; color: #6e6e73; }
+        h6 { font-size: 0.85em; color: \(secondaryTextColor); }
 
         p {
             margin-top: 0;
             margin-bottom: 16px;
+            color: \(textColor);
         }
 
         a {
-            color: #007aff;
+            color: \(linkColor);
             text-decoration: none;
         }
 
@@ -101,16 +123,17 @@ extension MarkdownRenderer {
         }
 
         code {
-            background-color: rgba(175, 184, 193, 0.2);
+            background-color: \(codeBackground);
             padding: 0.2em 0.4em;
             margin: 0;
             font-size: 85%;
             border-radius: 6px;
             font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+            color: \(textColor);
         }
 
         pre {
-            background-color: #f6f8fa;
+            background-color: \(preBackground);
             padding: 16px;
             overflow: auto;
             font-size: 85%;
@@ -127,8 +150,8 @@ extension MarkdownRenderer {
 
         blockquote {
             padding: 0 1em;
-            color: #6e6e73;
-            border-left: 0.25em solid #d0d0d0;
+            color: \(secondaryTextColor);
+            border-left: 0.25em solid \(borderColor);
             margin: 0 0 16px 0;
         }
 
@@ -140,6 +163,7 @@ extension MarkdownRenderer {
 
         li {
             margin-top: 0.25em;
+            color: \(textColor);
         }
 
         table {
@@ -150,23 +174,24 @@ extension MarkdownRenderer {
 
         table th, table td {
             padding: 6px 13px;
-            border: 1px solid #d0d0d0;
+            border: 1px solid \(borderColor);
+            color: \(textColor);
         }
 
         table th {
             font-weight: 600;
-            background-color: #f6f8fa;
+            background-color: \(tableHeaderBackground);
         }
 
         table tr:nth-child(2n) {
-            background-color: #f6f8fa;
+            background-color: \(tableRowBackground);
         }
 
         hr {
             height: 0.25em;
             padding: 0;
             margin: 24px 0;
-            background-color: #e5e5e5;
+            background-color: \(borderColor);
             border: 0;
         }
 
@@ -187,6 +212,14 @@ extension MarkdownRenderer {
         .task-list-item input {
             margin: 0 0.5em 0.25em -1.6em;
             vertical-align: middle;
+        }
+
+        strong {
+            color: \(textColor);
+        }
+
+        em {
+            color: \(textColor);
         }
         """
     }
