@@ -108,7 +108,7 @@ class FileSystemService {
         }
 
         // Create empty file
-        let initialContent = "# \(title)\n\n"
+        let initialContent = ""
         try initialContent.write(to: fileURL, atomically: true, encoding: .utf8)
 
         guard let note = Note(fromFileURL: fileURL) else {

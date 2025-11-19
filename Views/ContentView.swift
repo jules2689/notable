@@ -21,10 +21,14 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(viewModel: viewModel, searchText: $searchText)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 400)
+                .background(Color(nsColor: .textBackgroundColor))
         } detail: {
             EditorView(viewModel: viewModel)
                 .navigationSplitViewColumnWidth(min: 400, ideal: 800)
+                .background(Color(nsColor: .textBackgroundColor))
         }
+        .navigationSplitViewStyle(.balanced)
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.errorMessage = nil

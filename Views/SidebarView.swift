@@ -47,28 +47,29 @@ struct SidebarView: View {
                         }
                     }
                 }
-            }
-        }
-        .navigationTitle("")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        viewModel.createNote(title: "Untitled")
-                    } label: {
-                        Label("New Note", systemImage: "doc.badge.plus")
-                    }
+             }
+         }
+         .background(Color(nsColor: .textBackgroundColor))
+         .navigationTitle("")
+         .toolbar {
+             ToolbarItem(placement: .primaryAction) {
+                 Menu {
+                     Button {
+                         viewModel.createNote(title: "Untitled")
+                     } label: {
+                         Label("New Note", systemImage: "doc.badge.plus")
+                     }
 
-                    Button {
-                        viewModel.createFolder(name: "New Folder")
-                    } label: {
-                        Label("New Folder", systemImage: "folder.badge.plus")
-                    }
-                } label: {
-                    Label("Add", systemImage: "plus")
-                }
-            }
-        }
+                     Button {
+                         viewModel.createFolder(name: "New Folder")
+                     } label: {
+                         Label("New Folder", systemImage: "folder.badge.plus")
+                     }
+                 } label: {
+                     Label("Add", systemImage: "plus")
+                 }
+             }
+         }
     }
 }
 
@@ -101,7 +102,11 @@ struct SearchBar: View {
             }
         }
         .padding(8)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+        )
         .cornerRadius(8)
     }
 }

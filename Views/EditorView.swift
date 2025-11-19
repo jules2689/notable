@@ -52,7 +52,7 @@ struct EditorView: View {
             }
         }
         .navigationTitle("") // Gets rid of the default navigation title
-        .toolbarBackground(.clear, for: .navigationBar)
+        .toolbarBackground(Color(nsColor: .textBackgroundColor), for: .windowToolbar)
         .toolbar {
             // Editable title on the left side of the title bar
             ToolbarItem(placement: .navigation) {

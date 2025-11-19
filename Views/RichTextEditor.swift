@@ -202,6 +202,7 @@ struct RichTextEditor: NSViewRepresentable {
         }
 
         // WKNavigationDelegate - prevent navigation
+        @MainActor
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             // Allow initial load
             if navigationAction.navigationType == .other {
