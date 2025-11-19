@@ -278,7 +278,8 @@ struct HierarchicalNoteItemRow: View {
             case .note(let note):
                 viewModel.selectNote(note)
             case .folder(let folder):
-                viewModel.selectFolder(folder)
+                // Toggle expansion when clicking on folder
+                viewModel.toggleFolderExpansion(folder)
             }
         }
         .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
