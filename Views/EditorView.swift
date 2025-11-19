@@ -6,6 +6,8 @@ struct EditorView: View {
     @State private var editedContent: String = ""
     @State private var autoSaveTask: Task<Void, Never>?
     @State private var lastSavedContent: String = ""
+    @State private var renameTask: Task<Void, Never>?
+    @State private var pendingTitle: String = ""
     @FocusState private var isEditorFocused: Bool
 
     var body: some View {
@@ -55,16 +57,55 @@ struct EditorView: View {
             ToolbarItem(placement: .navigation) {
                 if viewModel.currentNote != nil {
                     TextField("Note Title", text: Binding(
-                        get: { viewModel.currentNote?.title ?? "" },
+                        get: { 
+                            if pendingTitle.isEmpty {
+                                return viewModel.currentNote?.title ?? ""
+                            }
+                            return pendingTitle
+                        },
                         set: { newTitle in
-                            if let note = viewModel.currentNote {
-                                viewModel.renameNote(note, to: newTitle)
+                            pendingTitle = newTitle
+                            
+                            // Debounce rename to avoid multiple calls while typing
+                            renameTask?.cancel()
+                            renameTask = Task {
+                                // Wait 0.5 seconds after user stops typing
+                                try? await Task.sleep(for: .milliseconds(500))
+                                
+                                // Check if task was cancelled
+                                guard !Task.isCancelled else { return }
+                                
+                                // Get the current note at the time of execution (may have changed)
+                                await MainActor.run {
+                                    guard let note = viewModel.currentNote else { return }
+                                    
+                                    // Only rename if title actually changed and is not empty
+                                    let trimmedTitle = newTitle.trimmingCharacters(in: .whitespaces)
+                                    if !trimmedTitle.isEmpty && trimmedTitle != note.title {
+                                        viewModel.renameNote(note, to: trimmedTitle)
+                                    }
+                                    pendingTitle = "" // Clear pending after rename attempt
+                                }
                             }
                         }
                     ))
                     .textFieldStyle(.plain)
                     .font(.headline)
                     .frame(maxWidth: 300)
+                    .onSubmit {
+                        // Rename immediately on submit (Enter key)
+                        renameTask?.cancel()
+                        if let note = viewModel.currentNote,
+                           !pendingTitle.trimmingCharacters(in: .whitespaces).isEmpty,
+                           pendingTitle != note.title {
+                            viewModel.renameNote(note, to: pendingTitle)
+                            pendingTitle = "" // Clear pending after rename
+                        }
+                    }
+                    .onChange(of: viewModel.currentNote?.id) { _, _ in
+                        // Reset pending title when note changes
+                        pendingTitle = ""
+                    }
                 }
             }
 

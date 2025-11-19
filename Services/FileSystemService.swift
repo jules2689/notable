@@ -129,12 +129,64 @@ class FileSystemService {
         let newFilename = "\(sanitizedTitle).md"
         let newURL = note.fileURL.deletingLastPathComponent().appendingPathComponent(newFilename)
 
-        // Check if file already exists
+        // Get current filename without extension for comparison
+        let currentFilename = note.fileURL.lastPathComponent
+        let currentNameWithoutExt = currentFilename.replacingOccurrences(of: ".md", with: "", options: .caseInsensitive)
+        
+        // If the sanitized new title matches the current filename (case-insensitive), no rename is needed
+        if sanitizedTitle.caseInsensitiveCompare(currentNameWithoutExt) == .orderedSame {
+            return note
+        }
+
+        // If the new URL is the same as the current URL, no rename is needed
+        if newURL == note.fileURL {
+            return note
+        }
+
+        // Check if file already exists at the new path
         if fileManager.fileExists(atPath: newURL.path) {
+            // Check if it's the same file by comparing resource identifiers
+            let currentResourceValues = try? note.fileURL.resourceValues(forKeys: [.fileResourceIdentifierKey])
+            let newResourceValues = try? newURL.resourceValues(forKeys: [.fileResourceIdentifierKey])
+            
+            // Compare resource identifiers using NSObject's isEqual method
+            let currentIdentifier = currentResourceValues?.fileResourceIdentifier
+            let newIdentifier = newResourceValues?.fileResourceIdentifier
+            
+            // If both have identifiers and they're equal, it's the same file
+            if let current = currentIdentifier as? NSObject,
+               let new = newIdentifier as? NSObject,
+               current.isEqual(new) {
+                // Same file, no rename needed - return the note with updated title
+                var updatedNote = note
+                updatedNote.title = sanitizedTitle
+                return updatedNote
+            }
+            
+            // If they're different files, throw error
             throw FileSystemError.fileAlreadyExists
         }
 
-        try fileManager.moveItem(at: note.fileURL, to: newURL)
+        do {
+            try fileManager.moveItem(at: note.fileURL, to: newURL)
+        } catch {
+            // If move fails because destination exists (race condition), check if it's the same file
+            if (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSFileWriteFileExistsError {
+                // Check if it's the same file
+                let currentResourceValues = try? note.fileURL.resourceValues(forKeys: [.fileResourceIdentifierKey])
+                let newResourceValues = try? newURL.resourceValues(forKeys: [.fileResourceIdentifierKey])
+                
+                if let current = currentResourceValues?.fileResourceIdentifier as? NSObject,
+                   let new = newResourceValues?.fileResourceIdentifier as? NSObject,
+                   current.isEqual(new) {
+                    // Same file, return updated note
+                    var updatedNote = note
+                    updatedNote.title = sanitizedTitle
+                    return updatedNote
+                }
+            }
+            throw error
+        }
 
         guard let renamedNote = Note(fromFileURL: newURL) else {
             throw FileSystemError.failedToRenameNote

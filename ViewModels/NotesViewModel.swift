@@ -85,12 +85,48 @@ class NotesViewModel {
     }
 
     func renameNote(_ note: Note, to newTitle: String) {
+        // Skip if title hasn't actually changed (after sanitization)
+        let sanitizedNewTitle = newTitle.trimmingCharacters(in: .whitespaces)
+        if sanitizedNewTitle.isEmpty || sanitizedNewTitle == note.title {
+            return
+        }
+        
         do {
             let renamedNote = try fileSystemService.renameNote(note, to: newTitle)
+            // If we got a renamed note back, the rename succeeded - clear any previous error
             if currentNote?.id == note.id {
                 currentNote = renamedNote
             }
             loadNotes()
+            // Clear error message on success
+            errorMessage = nil
+        } catch FileSystemError.fileAlreadyExists {
+            // Check if it's actually the same file - if so, silently ignore
+            // Otherwise, show the error
+            let invalidChars = CharacterSet(charactersIn: ":/\\?%*|\"<>")
+            let sanitizedTitle = newTitle.components(separatedBy: invalidChars).joined(separator: "-")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let currentFilename = note.fileURL.deletingPathExtension().lastPathComponent
+            
+            // Only show error if the sanitized title is different from current filename
+            // This handles cases where the file system allows the rename despite the error
+            if sanitizedTitle.caseInsensitiveCompare(currentFilename) != .orderedSame {
+                // Double-check: if the file was actually renamed, don't show error
+                // This can happen in race conditions where the check fails but the rename succeeds
+                let newFilename = "\(sanitizedTitle).md"
+                let newURL = note.fileURL.deletingLastPathComponent().appendingPathComponent(newFilename)
+                if FileManager.default.fileExists(atPath: newURL.path) {
+                    // File exists at new path - check if it's the same file or if rename succeeded
+                    // If rename succeeded, we'll find it in loadNotes(), so don't show error
+                    // Just reload to pick up the change
+                    loadNotes()
+                } else {
+                    errorMessage = "Failed to rename note: A file or folder with that name already exists"
+                }
+            } else {
+                // Same file, silently ignore - just reload to ensure state is correct
+                loadNotes()
+            }
         } catch {
             errorMessage = "Failed to rename note: \(error.localizedDescription)"
         }
