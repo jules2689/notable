@@ -1,5 +1,17 @@
 import SwiftUI
 
+// Define a focused value key for the view model
+struct NotesViewModelKey: FocusedValueKey {
+    typealias Value = NotesViewModel
+}
+
+extension FocusedValues {
+    var notesViewModel: NotesViewModel? {
+        get { self[NotesViewModelKey.self] }
+        set { self[NotesViewModelKey.self] = newValue }
+    }
+}
+
 struct ContentView: View {
     @State private var viewModel = NotesViewModel()
     @State private var searchText = ""
@@ -22,6 +34,7 @@ struct ContentView: View {
                 Text(errorMessage)
             }
         }
+        .focusedValue(\.notesViewModel, viewModel)
     }
 }
 

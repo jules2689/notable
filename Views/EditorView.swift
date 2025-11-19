@@ -66,6 +66,7 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .navigationTitle("") // Gets rid of the default navigation title
         .toolbar {
             // Editable title on the left side of the title bar
             ToolbarItem(placement: .navigation) {

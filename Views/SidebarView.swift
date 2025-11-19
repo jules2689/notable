@@ -54,6 +54,7 @@ struct SidebarView: View {
                 .listStyle(.sidebar)
             }
         }
+        .navigationTitle("")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {

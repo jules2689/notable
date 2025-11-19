@@ -9,11 +9,20 @@ struct Notable: App {
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("New Note") {
-                    // TODO: Implement new note creation
-                }
-                .keyboardShortcut("n", modifiers: .command)
+                NewNoteButton()
             }
         }
+    }
+}
+
+struct NewNoteButton: View {
+    @FocusedValue(\.notesViewModel) private var viewModel: NotesViewModel?
+
+    var body: some View {
+        Button("New Note") {
+            viewModel?.createNote(title: "Untitled")
+        }
+        .keyboardShortcut("n", modifiers: .command)
+        .disabled(viewModel == nil)
     }
 }
