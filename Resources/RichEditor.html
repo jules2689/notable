@@ -120,21 +120,70 @@
         }
 
         /* Tables */
+        .table-wrapper {
+            position: relative;
+            margin: 12px 0;
+            display: inline-block;
+            width: 100%;
+        }
+
         table {
             border-collapse: collapse;
             width: 100%;
-            margin: 12px 0;
             font-family: 'SF Mono', Monaco, monospace;
             font-size: 13px;
         }
+
         th, td {
             border: 1px solid var(--border-color);
             padding: 8px 12px;
             text-align: left;
+            position: relative;
+            min-width: 80px;
         }
+
         th {
             background-color: var(--code-bg);
             font-weight: 600;
+        }
+
+        /* Table controls */
+        .table-controls {
+            position: absolute;
+            display: none;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 4px;
+            z-index: 100;
+        }
+
+        .table-wrapper:hover .table-controls,
+        .table-wrapper:focus-within .table-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .table-controls button {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text-color);
+            white-space: nowrap;
+        }
+
+        .table-controls button:hover {
+            background: var(--border-color);
+        }
+
+        /* Selected table cell */
+        td.selected-cell, th.selected-cell {
+            outline: 2px solid var(--link-color);
+            outline-offset: -2px;
         }
 
         /* Links */
@@ -292,12 +341,54 @@
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 11px;
         }
+
+        /* Table navigation hint tooltip */
+        #table-hint {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--secondary-color);
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            z-index: 999;
+            max-width: 300px;
+        }
+        #table-hint.show {
+            display: block;
+            opacity: 0.85;
+        }
+        #table-hint kbd {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        #table-hint .hint-section {
+            margin-bottom: 4px;
+        }
+        #table-hint .hint-section:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
     <div id="editor" contenteditable="true"></div>
     <div id="slash-menu"></div>
     <div id="block-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> to exit block</div>
+    <div id="table-hint">
+        <div class="hint-section"><kbd>Tab</kbd> next cell · <kbd>⇧</kbd>+<kbd>Tab</kbd> prev cell</div>
+        <div class="hint-section"><kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>↑↓</kbd> add row · <kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>←→</kbd> add col</div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
@@ -319,10 +410,47 @@
             }
         });
 
-        // Configure turndown for markdown conversion
+        // Configure turndown for markdown conversion with table support
         const turndownService = new TurndownService({
             headingStyle: 'atx',
             codeBlockStyle: 'fenced'
+        });
+
+        // Add table support to turndown
+        turndownService.addRule('table', {
+            filter: 'table',
+            replacement: function(content, node) {
+                // Process the table structure manually to ensure separator row
+                let result = '';
+                const rows = node.querySelectorAll('tr');
+                const hasHeader = node.querySelector('thead') !== null;
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = row.querySelectorAll('th, td');
+                    const isHeaderRow = row.parentNode.nodeName === 'THEAD' ||
+                                       (rowIndex === 0 && hasHeader === false && cells[0] && cells[0].tagName === 'TH');
+
+                    // Build the row
+                    result += '|';
+                    cells.forEach(cell => {
+                        const cellText = cell.textContent.trim();
+                        result += ' ' + cellText + ' |';
+                    });
+                    result += '\n';
+
+                    // Add separator after header row
+                    if (isHeaderRow) {
+                        result += '|';
+                        cells.forEach(() => {
+                            result += ' --- |';
+                        });
+                        result += '\n';
+                    }
+                });
+
+                // Return with newlines before and after, but turndown handles the spacing
+                return '\n' + result;
+            }
         });
 
         // Add custom rules for task lists
@@ -338,6 +466,7 @@
         const editor = document.getElementById('editor');
         const slashMenu = document.getElementById('slash-menu');
         const blockHint = document.getElementById('block-hint');
+        const tableHint = document.getElementById('table-hint');
 
         let slashMenuVisible = false;
         let slashMenuItems = [];
@@ -386,8 +515,56 @@
             // This prevents marked from wrapping component syntax in <p> tags
             const withComponents = parseCustomComponents(markdown);
             editor.innerHTML = marked.parse(withComponents);
+
+            // Wrap all existing tables with controls
+            // Use Array.from to get a static copy since we'll be modifying the DOM
+            Array.from(editor.querySelectorAll('table')).forEach(table => {
+                if (!table.closest('.table-wrapper')) {
+                    // Check if table is inside a <p> tag (marked.js sometimes wraps tables in <p>)
+                    const parent = table.parentElement;
+                    const isInParagraph = parent && parent.tagName === 'P' && parent.children.length === 1;
+                    
+                    // Create wrapper first
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-wrapper';
+                    wrapper.contentEditable = 'false';
+                    
+                    const controls = document.createElement('div');
+                    controls.className = 'table-controls';
+                    controls.style.top = '-32px';
+                    controls.style.right = '0';
+                    controls.innerHTML = `
+                        <button onclick="addRowAbove(this)">+ Row Above</button>
+                        <button onclick="addRowBelow(this)">+ Row Below</button>
+                        <button onclick="addColumnLeft(this)">+ Col Left</button>
+                        <button onclick="addColumnRight(this)">+ Col Right</button>
+                        <button onclick="deleteRow(this)">− Row</button>
+                        <button onclick="deleteColumn(this)">− Col</button>
+                    `;
+                    
+                    // Make table cells editable
+                    table.querySelectorAll('td, th').forEach(cell => {
+                        cell.contentEditable = 'true';
+                    });
+                    
+                    wrapper.appendChild(controls);
+                    
+                    // Replace table with wrapper first, then append table to wrapper
+                    if (isInParagraph) {
+                        // Replace the <p> tag with the wrapper
+                        parent.replaceWith(wrapper);
+                        wrapper.appendChild(table);
+                    } else if (parent) {
+                        // Replace table with wrapper
+                        parent.replaceChild(wrapper, table);
+                        // Now append table to wrapper
+                        wrapper.appendChild(table);
+                    }
+                }
+            });
+
             applySyntaxHighlighting();
-            notifyChange();
+            // Don't call notifyChange() here - this is initial content load, not a user edit
         }
 
         // Helper to escape quotes for HTML attributes (minimal escaping)
@@ -497,6 +674,14 @@
             // Clone the editor content to avoid modifying the DOM
             const clone = editor.cloneNode(true);
 
+            // Unwrap tables from table-wrapper and remove controls
+            clone.querySelectorAll('.table-wrapper').forEach(wrapper => {
+                const table = wrapper.querySelector('table');
+                if (table) {
+                    wrapper.replaceWith(table);
+                }
+            });
+
             // Update component data attributes from editable fields
             clone.querySelectorAll('.component-wrapper').forEach(component => {
                 const type = component.getAttribute('data-component');
@@ -538,22 +723,39 @@
         // Handle input changes
         editor.addEventListener('input', (e) => {
             handleMarkdownConversion(e);
+            handleTableInput();
             applySyntaxHighlighting();
             notifyChange();
             handleSlashCommand();
         });
 
-        // Handle checkbox clicks
+        // Handle checkbox clicks and table cell selection
         editor.addEventListener('click', (e) => {
             if (e.target.type === 'checkbox') {
                 e.target.parentElement.classList.toggle('checked', e.target.checked);
                 notifyChange();
+            }
+
+            // Handle table cell selection
+            if (e.target.tagName === 'TD' || e.target.tagName === 'TH') {
+                // Remove previous selection
+                document.querySelectorAll('.selected-cell').forEach(cell => {
+                    cell.classList.remove('selected-cell');
+                });
+                // Add selection to clicked cell
+                e.target.classList.add('selected-cell');
             }
         });
 
         // Handle component URL/location editing with higher priority
         editor.addEventListener('input', (e) => {
             const target = e.target;
+
+            // Handle table cell editing
+            if (target.tagName === 'TD' || target.tagName === 'TH') {
+                notifyChange();
+                return;
+            }
 
             // Update iframe src when URL is edited
             if (target.classList.contains('component-url')) {
@@ -806,6 +1008,346 @@
             }, 0);
         }
 
+        // Handle table input - parse markdown tables and convert to HTML
+        function handleTableInput() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            let node = range.startContainer;
+
+            // Get the parent element
+            if (node.nodeType === Node.TEXT_NODE) {
+                node = node.parentElement;
+            }
+
+            // Must be inside the editor
+            if (!node || !editor.contains(node)) return;
+
+            // Look for table patterns in current node and surrounding siblings
+            // Gather all consecutive text/p elements that might form a table
+            let currentBlock = node;
+            while (currentBlock && currentBlock !== editor && currentBlock.parentElement !== editor) {
+                currentBlock = currentBlock.parentElement;
+            }
+
+            if (!currentBlock || currentBlock === editor) return;
+
+            // Collect this block and adjacent blocks to check for table pattern
+            let blocks = [currentBlock];
+            let prev = currentBlock.previousElementSibling;
+            let next = currentBlock.nextElementSibling;
+
+            // Look back up to 10 blocks
+            let lookback = 10;
+            while (prev && lookback-- > 0) {
+                blocks.unshift(prev);
+                prev = prev.previousElementSibling;
+            }
+
+            // Look ahead up to 10 blocks
+            let lookahead = 10;
+            while (next && lookahead-- > 0) {
+                blocks.push(next);
+                next = next.nextElementSibling;
+            }
+
+            // Extract text from blocks
+            let lines = blocks.map(b => b.textContent || '').filter(l => l.trim());
+            let blockElements = blocks;
+
+            // Try to find a markdown table pattern
+            // Table format:
+            // | Header 1 | Header 2 |
+            // |----------|----------|
+            // | Cell 1   | Cell 2   |
+
+            // Find the separator line (contains |---|)
+            let separatorIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (/^\|?\s*[-:|\s]+\s*\|?\s*$/.test(lines[i]) && lines[i].includes('-')) {
+                    separatorIndex = i;
+                    break;
+                }
+            }
+
+            if (separatorIndex > 0 && separatorIndex < lines.length - 1) {
+                // We found a potential table!
+                let headerLine = lines[separatorIndex - 1];
+                let separatorLine = lines[separatorIndex];
+
+                // Verify header line looks like a table row
+                if (!headerLine.includes('|')) return;
+
+                // Count how many rows belong to this table
+                let tableStartIndex = separatorIndex - 1;
+                let tableEndIndex = separatorIndex;
+
+                // Collect all data rows after separator
+                for (let i = separatorIndex + 1; i < lines.length; i++) {
+                    if (lines[i].includes('|')) {
+                        tableEndIndex = i;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Extract just the table lines
+                let tableLines = lines.slice(tableStartIndex, tableEndIndex + 1);
+                let tableMarkdown = tableLines.join('\n');
+
+                // Parse the table using marked
+                let tableHTML = marked.parse(tableMarkdown);
+
+                // Create table element from parsed HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = tableHTML;
+                const tableElement = tempDiv.querySelector('table');
+
+                if (tableElement) {
+                    // Find the actual DOM elements to replace
+                    let firstBlock = blockElements[blocks.findIndex(b => (b.textContent || '').trim() === tableLines[0])];
+                    let lastBlock = blockElements[blocks.findIndex(b => (b.textContent || '').trim() === tableLines[tableLines.length - 1])];
+
+                    if (firstBlock && lastBlock) {
+                        // Remove all blocks in the table range except the first
+                        let currentRemove = firstBlock.nextElementSibling;
+                        while (currentRemove && currentRemove !== lastBlock.nextElementSibling) {
+                            let toRemove = currentRemove;
+                            currentRemove = currentRemove.nextElementSibling;
+                            toRemove.remove();
+                        }
+
+                        // Wrap table in table-wrapper with controls
+                        const wrapper = wrapTableWithControls(tableElement);
+
+                        // Replace first block with the wrapped table
+                        firstBlock.replaceWith(wrapper);
+
+                        // Place cursor after the table
+                        const newRange = document.createRange();
+                        newRange.setStartAfter(wrapper);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+
+                        notifyChange();
+                    }
+                }
+            }
+        }
+
+        // Wrap table with controls
+        function wrapTableWithControls(table) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-wrapper';
+            wrapper.contentEditable = 'false';
+
+            const controls = document.createElement('div');
+            controls.className = 'table-controls';
+            controls.style.top = '-32px';
+            controls.style.right = '0';
+            controls.innerHTML = `
+                <button onclick="addRowAbove(this)">+ Row Above</button>
+                <button onclick="addRowBelow(this)">+ Row Below</button>
+                <button onclick="addColumnLeft(this)">+ Col Left</button>
+                <button onclick="addColumnRight(this)">+ Col Right</button>
+                <button onclick="deleteRow(this)">− Row</button>
+                <button onclick="deleteColumn(this)">− Col</button>
+            `;
+
+            // Make table cells editable
+            table.querySelectorAll('td, th').forEach(cell => {
+                cell.contentEditable = 'true';
+            });
+
+            wrapper.appendChild(controls);
+            wrapper.appendChild(table);
+
+            return wrapper;
+        }
+
+        // Table manipulation functions
+        window.addRowAbove = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const targetRow = selectedCell ? selectedCell.parentElement : table.querySelector('tbody tr, tr');
+
+            if (targetRow) {
+                // Don't allow adding rows above header
+                const isHeaderRow = targetRow.parentElement.tagName === 'THEAD' ||
+                                   targetRow.querySelector('th') !== null;
+
+                if (isHeaderRow) {
+                    return; // Silently ignore - can't add above header
+                }
+
+                const newRow = document.createElement('tr');
+                const cellCount = targetRow.querySelectorAll('td, th').length;
+
+                for (let i = 0; i < cellCount; i++) {
+                    const cell = document.createElement('td');
+                    cell.contentEditable = 'true';
+                    cell.textContent = '';
+                    newRow.appendChild(cell);
+                }
+
+                targetRow.parentElement.insertBefore(newRow, targetRow);
+                notifyChange();
+            }
+        };
+
+        window.addRowBelow = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const targetRow = selectedCell ? selectedCell.parentElement : table.querySelector('tbody tr:last-child, tr:last-child');
+
+            if (targetRow) {
+                const newRow = document.createElement('tr');
+                const cellCount = targetRow.querySelectorAll('td, th').length;
+
+                for (let i = 0; i < cellCount; i++) {
+                    const cell = document.createElement('td');
+                    cell.contentEditable = 'true';
+                    cell.textContent = '';
+                    newRow.appendChild(cell);
+                }
+
+                if (targetRow.nextElementSibling) {
+                    targetRow.parentElement.insertBefore(newRow, targetRow.nextElementSibling);
+                } else {
+                    targetRow.parentElement.appendChild(newRow);
+                }
+
+                notifyChange();
+            }
+        };
+
+        window.addColumnLeft = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const cellIndex = selectedCell ? Array.from(selectedCell.parentElement.children).indexOf(selectedCell) : 0;
+
+            table.querySelectorAll('tr').forEach((row, rowIndex) => {
+                // Check if this is a header row
+                const isHeaderRow = row.parentElement.tagName === 'THEAD' ||
+                                   row.querySelector('th') !== null ||
+                                   (rowIndex === 0 && table.querySelector('thead') === null);
+
+                const newCell = document.createElement(isHeaderRow ? 'th' : 'td');
+                newCell.contentEditable = 'true';
+                newCell.textContent = '';
+                const targetCell = row.children[cellIndex];
+                if (targetCell) {
+                    row.insertBefore(newCell, targetCell);
+                }
+            });
+
+            notifyChange();
+        };
+
+        window.addColumnRight = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const cellIndex = selectedCell ? Array.from(selectedCell.parentElement.children).indexOf(selectedCell) : -1;
+
+            table.querySelectorAll('tr').forEach((row, rowIndex) => {
+                // Check if this is a header row
+                const isHeaderRow = row.parentElement.tagName === 'THEAD' ||
+                                   row.querySelector('th') !== null ||
+                                   (rowIndex === 0 && table.querySelector('thead') === null);
+
+                const newCell = document.createElement(isHeaderRow ? 'th' : 'td');
+                newCell.contentEditable = 'true';
+                newCell.textContent = '';
+                const targetCell = row.children[cellIndex];
+                if (targetCell && targetCell.nextElementSibling) {
+                    row.insertBefore(newCell, targetCell.nextElementSibling);
+                } else {
+                    row.appendChild(newCell);
+                }
+            });
+
+            notifyChange();
+        };
+
+        window.deleteRow = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const targetRow = selectedCell ? selectedCell.parentElement : table.querySelector('tbody tr:last-child, tr:last-child');
+
+            if (targetRow && table.querySelectorAll('tr').length > 2) {
+                // Don't allow deleting the header row
+                const isHeaderRow = targetRow.parentElement.tagName === 'THEAD' ||
+                                   targetRow.querySelector('th') !== null;
+
+                if (isHeaderRow) {
+                    return; // Silently ignore - can't delete header
+                }
+
+                targetRow.remove();
+                notifyChange();
+            }
+        };
+
+        window.deleteColumn = function(button) {
+            const wrapper = button.closest('.table-wrapper');
+            const table = wrapper.querySelector('table');
+            const selectedCell = table.querySelector('.selected-cell');
+            const cellIndex = selectedCell ? Array.from(selectedCell.parentElement.children).indexOf(selectedCell) : -1;
+
+            if (cellIndex >= 0) {
+                const firstRow = table.querySelector('tr');
+                if (firstRow && firstRow.querySelectorAll('td, th').length > 1) {
+                    table.querySelectorAll('tr').forEach(row => {
+                        if (row.children[cellIndex]) {
+                            row.children[cellIndex].remove();
+                        }
+                    });
+                    notifyChange();
+                }
+            }
+        };
+
+        // Cell navigation helpers
+        function getNextCell(currentCell) {
+            const nextCell = currentCell.nextElementSibling;
+            if (nextCell && (nextCell.tagName === 'TD' || nextCell.tagName === 'TH')) {
+                return nextCell;
+            }
+
+            // Move to first cell of next row
+            const currentRow = currentCell.parentElement;
+            const nextRow = currentRow.nextElementSibling;
+            if (nextRow) {
+                return nextRow.querySelector('td, th');
+            }
+
+            return null;
+        }
+
+        function getPreviousCell(currentCell) {
+            const prevCell = currentCell.previousElementSibling;
+            if (prevCell && (prevCell.tagName === 'TD' || prevCell.tagName === 'TH')) {
+                return prevCell;
+            }
+
+            // Move to last cell of previous row
+            const currentRow = currentCell.parentElement;
+            const prevRow = currentRow.previousElementSibling;
+            if (prevRow) {
+                const cells = prevRow.querySelectorAll('td, th');
+                return cells[cells.length - 1];
+            }
+
+            return null;
+        }
+
         // Helper: place cursor at end of element
         function placeCursorAtEnd(element) {
             const selection = window.getSelection();
@@ -947,7 +1489,12 @@
                 // Insert HTML template
                 const template = document.createElement('div');
                 template.innerHTML = command.template;
-                const node = template.firstChild;
+                let node = template.firstChild;
+
+                // Wrap tables with controls
+                if (node.tagName === 'TABLE') {
+                    node = wrapTableWithControls(node);
+                }
 
                 range.insertNode(node);
                 range.setStartAfter(node);
@@ -963,6 +1510,124 @@
 
         // Keyboard navigation for slash menu and block exit
         document.addEventListener('keydown', (e) => {
+            // Handle table navigation and shortcuts
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                let node = range.startContainer;
+                if (node.nodeType === Node.TEXT_NODE) {
+                    node = node.parentElement;
+                }
+
+                // Check if we're in a table cell
+                const currentCell = node.closest('td, th');
+                const currentTable = node.closest('table');
+
+                if (currentCell && currentTable) {
+                    // Mark as selected for button actions
+                    document.querySelectorAll('.selected-cell').forEach(cell => {
+                        cell.classList.remove('selected-cell');
+                    });
+                    currentCell.classList.add('selected-cell');
+
+                    // Tab: Move to next cell
+                    if (e.key === 'Tab' && !e.shiftKey) {
+                        e.preventDefault();
+                        const nextCell = getNextCell(currentCell);
+                        if (nextCell) {
+                            nextCell.focus();
+                            const newRange = document.createRange();
+                            newRange.selectNodeContents(nextCell);
+                            newRange.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        }
+                        return;
+                    }
+
+                    // Shift+Tab: Move to previous cell
+                    if (e.key === 'Tab' && e.shiftKey) {
+                        e.preventDefault();
+                        const prevCell = getPreviousCell(currentCell);
+                        if (prevCell) {
+                            prevCell.focus();
+                            const newRange = document.createRange();
+                            newRange.selectNodeContents(prevCell);
+                            newRange.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+ArrowUp: Add row above
+                    if (e.key === 'ArrowUp' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="addRowAbove"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+ArrowDown: Add row below
+                    if (e.key === 'ArrowDown' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="addRowBelow"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+ArrowLeft: Add column left
+                    if (e.key === 'ArrowLeft' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="addColumnLeft"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+ArrowRight: Add column right
+                    if (e.key === 'ArrowRight' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="addColumnRight"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+Backspace: Delete row
+                    if (e.key === 'Backspace' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="deleteRow"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+
+                    // Cmd/Ctrl+Shift+Delete: Delete column
+                    if (e.key === 'Delete' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        const wrapper = currentTable.closest('.table-wrapper');
+                        if (wrapper) {
+                            const button = wrapper.querySelector('button[onclick*="deleteColumn"]');
+                            if (button) button.click();
+                        }
+                        return;
+                    }
+                }
+            }
+
             // Handle component deletion with backspace/delete
             if (e.key === 'Backspace' || e.key === 'Delete') {
                 const selection = window.getSelection();
@@ -1116,6 +1781,7 @@
             const selection = window.getSelection();
             if (!selection.rangeCount) {
                 blockHint.classList.remove('show');
+                tableHint.classList.remove('show');
                 return;
             }
 
@@ -1124,12 +1790,22 @@
                 node = node.parentElement;
             }
 
+            // Check if cursor is in a table
+            const tableCell = node.closest('td, th');
+            if (tableCell) {
+                blockHint.classList.remove('show');
+                tableHint.classList.add('show');
+                return;
+            }
+
             // Check if cursor is in a special block
             const specialBlock = node.closest('pre, blockquote, .callout, .iframe-container, .map-container');
             if (specialBlock) {
                 blockHint.classList.add('show');
+                tableHint.classList.remove('show');
             } else {
                 blockHint.classList.remove('show');
+                tableHint.classList.remove('show');
             }
         }
 
