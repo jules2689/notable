@@ -25,57 +25,6 @@ struct EditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let note = viewModel.currentNote {
-                // Title bar
-                HStack {
-                    TextField("Note Title", text: Binding(
-                        get: { note.title },
-                        set: { newTitle in
-                            viewModel.renameNote(note, to: newTitle)
-                        }
-                    ))
-                    .font(.title)
-                    .textFieldStyle(.plain)
-                    .padding()
-
-                    Spacer()
-
-                    // Mode picker
-                    Picker("View Mode", selection: $editorMode) {
-                        ForEach(EditorMode.allCases, id: \.self) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 200)
-                    .padding(.trailing)
-
-                    // Save indicator
-                    if editedContent != lastSavedContent {
-                        HStack(spacing: 4) {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 6))
-                                .foregroundStyle(.orange)
-                            Text("Unsaved")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.trailing)
-                    } else if editedContent == lastSavedContent && !editedContent.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.green)
-                            Text("Saved")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.trailing)
-                    }
-                }
-                .background(Color(nsColor: .controlBackgroundColor))
-
-                Divider()
-
                 // Content area based on mode
                 Group {
                     switch editorMode {
@@ -118,6 +67,62 @@ struct EditorView: View {
             }
         }
         .toolbar {
+            // Editable title on the left side of the title bar
+            ToolbarItem(placement: .navigation) {
+                if viewModel.currentNote != nil {
+                    TextField("Note Title", text: Binding(
+                        get: { viewModel.currentNote?.title ?? "" },
+                        set: { newTitle in
+                            if let note = viewModel.currentNote {
+                                viewModel.renameNote(note, to: newTitle)
+                            }
+                        }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.headline)
+                    .frame(maxWidth: 300)
+                }
+            }
+
+            // View mode picker on the right
+            ToolbarItem(placement: .automatic) {
+                if viewModel.currentNote != nil {
+                    Picker("View Mode", selection: $editorMode) {
+                        ForEach(EditorMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
+            }
+
+            // Save status indicator on the right
+            ToolbarItem(placement: .automatic) {
+                if viewModel.currentNote != nil {
+                    if editedContent != lastSavedContent {
+                        HStack(spacing: 4) {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 6))
+                                .foregroundStyle(.orange)
+                            Text("Unsaved")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if editedContent == lastSavedContent && !editedContent.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.green)
+                            Text("Saved")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // Save button on the right
             ToolbarItem(placement: .primaryAction) {
                 if viewModel.currentNote != nil {
                     Button {
