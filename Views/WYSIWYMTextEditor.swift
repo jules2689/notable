@@ -148,7 +148,10 @@ struct WYSIWYMTextEditor: NSViewRepresentable {
             applyInlineCode(to: attributedString)
             applyCodeBlocks(to: attributedString)
             applyLinks(to: attributedString)
+            applyTaskLists(to: attributedString)
             applyLists(to: attributedString)
+            applyTables(to: attributedString)
+            applyCustomComponents(to: attributedString)
 
             return attributedString
         }
@@ -292,11 +295,54 @@ struct WYSIWYMTextEditor: NSViewRepresentable {
             }
         }
 
+        private func applyTaskLists(to attributedString: NSMutableAttributedString) {
+            let text = attributedString.string
+
+            // Task lists: - [ ] or - [x] or - [X]
+            let pattern = "^[\\s]*-\\s+\\[([ xX])\\]\\s+(.+)$"
+
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return }
+
+            let matches = regex.matches(in: text, range: NSRange(location: 0, length: text.count))
+
+            for match in matches {
+                let checkboxRange = match.range(at: 1)
+
+                if let checkboxStringRange = Range(checkboxRange, in: text) {
+                    let checkboxChar = String(text[checkboxStringRange])
+                    let isChecked = checkboxChar.lowercased() == "x"
+
+                    // Find the full checkbox pattern including brackets
+                    let fullCheckboxStart = match.range.location
+                    let checkboxMarkerPattern = "-\\s+\\[([ xX])\\]"
+
+                    if let checkboxRegex = try? NSRegularExpression(pattern: checkboxMarkerPattern),
+                       let checkboxMatch = checkboxRegex.firstMatch(in: text, range: match.range) {
+
+                        // Style the checkbox with appropriate emoji
+                        let checkboxSymbol = isChecked ? "☑" : "☐"
+                        let checkboxColor = isChecked ? NSColor.systemGreen : NSColor.systemBlue
+
+                        // Style the dash and checkbox
+                        attributedString.addAttribute(.foregroundColor, value: checkboxColor, range: checkboxMatch.range)
+                        attributedString.addAttribute(.font, value: NSFont.systemFont(ofSize: 16), range: checkboxMatch.range)
+
+                        // If checked, strike through the content
+                        if isChecked {
+                            let contentRange = match.range(at: 2)
+                            attributedString.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: contentRange)
+                            attributedString.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: contentRange)
+                        }
+                    }
+                }
+            }
+        }
+
         private func applyLists(to attributedString: NSMutableAttributedString) {
             let text = attributedString.string
 
-            // Unordered lists: - item or * item
-            let pattern = "^[\\s]*[-*]\\s+(.+)$"
+            // Unordered lists: - item or * item (but not task lists)
+            let pattern = "^[\\s]*[-*]\\s+(?!\\[[ xX]\\])(.+)$"
 
             guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return }
 
@@ -307,6 +353,103 @@ struct WYSIWYMTextEditor: NSViewRepresentable {
 
                 // Style the list marker
                 attributedString.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: markerRange)
+            }
+        }
+
+        private func applyTables(to attributedString: NSMutableAttributedString) {
+            let text = attributedString.string
+
+            // Table rows: lines with | separators
+            let pattern = "^\\|(.+\\|)+$"
+
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return }
+
+            let matches = regex.matches(in: text, range: NSRange(location: 0, length: text.count))
+
+            for match in matches {
+                let lineRange = match.range
+
+                // Check if this is a separator line (contains only |, -, and spaces)
+                if let lineStringRange = Range(lineRange, in: text) {
+                    let lineString = String(text[lineStringRange])
+                    let isSeparatorLine = lineString.allSatisfy { char in
+                        char == "|" || char == "-" || char == ":" || char.isWhitespace
+                    }
+
+                    if isSeparatorLine {
+                        // Style separator lines dimmer
+                        attributedString.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: lineRange)
+                    } else {
+                        // Style table borders
+                        let borderColor = NSColor.systemBlue
+                        let cellFont = NSFont.systemFont(ofSize: 13)
+
+                        // Find all pipe characters
+                        for i in 0..<lineString.count {
+                            let charIndex = lineString.index(lineString.startIndex, offsetBy: i)
+                            if lineString[charIndex] == "|" {
+                                let pipeRange = NSRange(location: lineRange.location + i, length: 1)
+                                attributedString.addAttribute(.foregroundColor, value: borderColor, range: pipeRange)
+                            }
+                        }
+
+                        // Apply monospace font to the entire row for better alignment
+                        attributedString.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: lineRange)
+                    }
+                }
+            }
+        }
+
+        private func applyCustomComponents(to attributedString: NSMutableAttributedString) {
+            let text = attributedString.string
+
+            // Custom components: {% component_name args %}
+            let pattern = "\\{%\\s*(\\w+)\\s+([^%]+?)\\s*%\\}"
+
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+
+            let matches = regex.matches(in: text, range: NSRange(location: 0, length: text.count))
+
+            for match in matches {
+                let fullRange = match.range
+                let componentNameRange = match.range(at: 1)
+
+                // Determine component type and color
+                var componentColor = NSColor.systemPurple
+                if let componentNameStringRange = Range(componentNameRange, in: text) {
+                    let componentName = String(text[componentNameStringRange])
+                    switch componentName.lowercased() {
+                    case "callout":
+                        componentColor = NSColor.systemIndigo
+                    case "iframe":
+                        componentColor = NSColor.systemTeal
+                    case "map":
+                        componentColor = NSColor.systemOrange
+                    default:
+                        componentColor = NSColor.systemPurple
+                    }
+                }
+
+                // Style the entire component
+                let backgroundColor = componentColor.withAlphaComponent(0.1)
+                attributedString.addAttribute(.backgroundColor, value: backgroundColor, range: fullRange)
+                attributedString.addAttribute(.foregroundColor, value: componentColor, range: fullRange)
+
+                // Make the braces and percent signs smaller
+                let smallFont = NSFont.systemFont(ofSize: 11)
+
+                // Style opening {%
+                if fullRange.location + 1 < text.count {
+                    attributedString.addAttribute(.font, value: smallFont, range: NSRange(location: fullRange.location, length: 2))
+                }
+
+                // Style closing %}
+                if fullRange.location + fullRange.length >= 2 {
+                    attributedString.addAttribute(.font, value: smallFont, range: NSRange(location: fullRange.location + fullRange.length - 2, length: 2))
+                }
+
+                // Bold the component name
+                attributedString.addAttribute(.font, value: NSFont.boldSystemFont(ofSize: 14), range: componentNameRange)
             }
         }
 

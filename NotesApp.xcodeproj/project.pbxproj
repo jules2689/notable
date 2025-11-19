@@ -26,6 +26,8 @@
 		AA0017 /* SlashCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* SlashCommandView.swift */; };
 		AA0018 /* SlashCommandTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0019 /* SlashCommandTextEditor.swift */; };
 		AA0020 /* WYSIWYMTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0020 /* WYSIWYMTextEditor.swift */; };
+		AA0021 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0021 /* RichTextEditor.swift */; };
+		AA0022 /* RichEditor.html in Resources */ = {isa = PBXBuildFile; fileRef = BB0022 /* RichEditor.html */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +53,8 @@
 		BB0018 /* SlashCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandView.swift; sourceTree = "<group>"; };
 		BB0019 /* SlashCommandTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandTextEditor.swift; sourceTree = "<group>"; };
 		BB0020 /* WYSIWYMTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WYSIWYMTextEditor.swift; sourceTree = "<group>"; };
+		BB0021 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
+		BB0022 /* RichEditor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = RichEditor.html; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +78,7 @@
 				FF0003 /* ViewModels */,
 				FF0004 /* Services */,
 				FF0005 /* Utils */,
+				FF0006 /* Resources */,
 				BB0003 /* Assets.xcassets */,
 				BB0004 /* Notable.entitlements */,
 				GG0001 /* Products */,
@@ -90,6 +95,7 @@
 				BB0018 /* SlashCommandView.swift */,
 				BB0019 /* SlashCommandTextEditor.swift */,
 				BB0020 /* WYSIWYMTextEditor.swift */,
+				BB0021 /* RichTextEditor.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -130,6 +136,14 @@
 				BB0017 /* ComponentParser.swift */,
 			);
 			path = Utils;
+			sourceTree = "<group>";
+		};
+		FF0006 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BB0022 /* RichEditor.html */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		GG0001 /* Products */ = {
@@ -206,6 +220,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0003 /* Assets.xcassets in Resources */,
+				AA0022 /* RichEditor.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -234,6 +249,7 @@
 				AA0017 /* SlashCommandView.swift in Sources */,
 				AA0018 /* SlashCommandTextEditor.swift in Sources */,
 				AA0020 /* WYSIWYMTextEditor.swift in Sources */,
+				AA0021 /* RichTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
