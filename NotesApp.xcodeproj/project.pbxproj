@@ -18,12 +18,6 @@
 		AA0009 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0010 /* NotesViewModel.swift */; };
 		AA0010 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0011 /* SidebarView.swift */; };
 		AA0011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0012 /* EditorView.swift */; };
-		AA0012 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0013 /* MarkdownRenderer.swift */; };
-		AA0013 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0014 /* MarkdownView.swift */; };
-		AA0014 /* Component.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0015 /* Component.swift */; };
-		AA0015 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0016 /* SlashCommand.swift */; };
-		AA0016 /* ComponentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0017 /* ComponentParser.swift */; };
-		AA0017 /* SlashCommandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* SlashCommandView.swift */; };
 		AA0021 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0021 /* RichTextEditor.swift */; };
 		AA0022 /* RichEditor.html in Resources */ = {isa = PBXBuildFile; fileRef = BB0022 /* RichEditor.html */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
@@ -43,12 +37,6 @@
 		BB0010 /* NotesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesViewModel.swift; sourceTree = "<group>"; };
 		BB0011 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		BB0012 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
-		BB0013 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
-		BB0014 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
-		BB0015 /* Component.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Component.swift; sourceTree = "<group>"; };
-		BB0016 /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
-		BB0017 /* ComponentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentParser.swift; sourceTree = "<group>"; };
-		BB0018 /* SlashCommandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandView.swift; sourceTree = "<group>"; };
 		BB0021 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		BB0022 /* RichEditor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = RichEditor.html; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -87,8 +75,6 @@
 				BB0002 /* ContentView.swift */,
 				BB0011 /* SidebarView.swift */,
 				BB0012 /* EditorView.swift */,
-				BB0014 /* MarkdownView.swift */,
-				BB0018 /* SlashCommandView.swift */,
 				BB0021 /* RichTextEditor.swift */,
 			);
 			path = Views;
@@ -101,8 +87,6 @@
 				BB0006 /* Folder.swift */,
 				BB0007 /* NoteItem.swift */,
 				BB0008 /* Workspace.swift */,
-				BB0015 /* Component.swift */,
-				BB0016 /* SlashCommand.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -126,8 +110,6 @@
 		FF0005 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				BB0013 /* MarkdownRenderer.swift */,
-				BB0017 /* ComponentParser.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -235,12 +217,6 @@
 				AA0009 /* NotesViewModel.swift in Sources */,
 				AA0010 /* SidebarView.swift in Sources */,
 				AA0011 /* EditorView.swift in Sources */,
-				AA0012 /* MarkdownRenderer.swift in Sources */,
-				AA0013 /* MarkdownView.swift in Sources */,
-				AA0014 /* Component.swift in Sources */,
-				AA0015 /* SlashCommand.swift in Sources */,
-				AA0016 /* ComponentParser.swift in Sources */,
-				AA0017 /* SlashCommandView.swift in Sources */,
 				AA0021 /* RichTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

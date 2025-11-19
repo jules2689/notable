@@ -109,18 +109,24 @@ struct EditorView: View {
                 }
             }
 
-            // Save status indicator on the right
+            // Save status indicator on the right (clickable to save)
             ToolbarItem(placement: .automatic) {
                 if viewModel.currentNote != nil {
                     if editedContent != lastSavedContent {
-                        HStack(spacing: 4) {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 6))
-                                .foregroundStyle(.orange)
-                            Text("Unsaved")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            saveNote()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundStyle(.orange)
+                                Text("Unsaved")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .keyboardShortcut("s", modifiers: .command)
                     } else if editedContent == lastSavedContent && !editedContent.isEmpty {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
@@ -131,18 +137,6 @@ struct EditorView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                }
-            }
-
-            // Save button on the right
-            ToolbarItem(placement: .primaryAction) {
-                if viewModel.currentNote != nil {
-                    Button {
-                        saveNote()
-                    } label: {
-                        Label("Save", systemImage: "square.and.arrow.down")
-                    }
-                    .keyboardShortcut("s", modifiers: .command)
                 }
             }
         }
