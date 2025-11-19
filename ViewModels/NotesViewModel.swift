@@ -141,6 +141,17 @@ class NotesViewModel {
         fileSystemService.workspace.expandedFolders.contains(folder.id)
     }
 
+    // MARK: - Move Operations
+
+    func moveItem(_ item: NoteItem, to folder: Folder) {
+        do {
+            _ = try fileSystemService.moveItem(item, to: folder.fileURL)
+            loadNotes()
+        } catch {
+            errorMessage = "Failed to move item: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Search
 
     func searchNotes(query: String) {

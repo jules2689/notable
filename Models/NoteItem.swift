@@ -1,7 +1,9 @@
 import Foundation
+import CoreTransferable
+import UniformTypeIdentifiers
 
 /// Represents an item in the sidebar navigation (either a Note or Folder)
-enum NoteItem: Identifiable, Codable, Hashable {
+enum NoteItem: Identifiable, Codable, Hashable, Transferable {
     case note(Note)
     case folder(Folder)
 
@@ -54,6 +56,12 @@ enum NoteItem: Identifiable, Codable, Hashable {
         }
         return false
     }
+
+    // MARK: - Transferable Conformance
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .noteItem)
+    }
 }
 
 extension NoteItem {
@@ -72,4 +80,10 @@ extension NoteItem {
             return .note(note)
         }
     }
+}
+
+// MARK: - UTType Extension
+
+extension UTType {
+    static let noteItem = UTType(exportedAs: "com.notesapp.noteitem")
 }

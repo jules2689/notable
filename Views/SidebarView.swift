@@ -119,6 +119,7 @@ struct NoteItemRow: View {
     @State private var showingRenameAlert = false
     @State private var showingDeleteAlert = false
     @State private var newName = ""
+    @State private var isTargeted = false
 
     var body: some View {
         HStack {
@@ -130,9 +131,17 @@ struct NoteItemRow: View {
                 .lineLimit(1)
 
             Spacer()
+
+            // Show item count for folders
+            if item.isFolder, case .folder(let folder) = item {
+                Text("\(folder.children.count)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .background(isTargeted ? Color.accentColor.opacity(0.2) : Color.clear)
         .contextMenu {
             if item.isNote {
                 Button {
@@ -165,6 +174,35 @@ struct NoteItemRow: View {
                     Label("Delete", systemImage: "trash")
                 }
             }
+        }
+        .draggable(item) {
+            // Drag preview
+            HStack {
+                Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
+                    .foregroundStyle(item.isFolder ? .blue : .secondary)
+                Text(item.name)
+            }
+            .padding(8)
+            .background(.background)
+            .cornerRadius(8)
+        }
+        .dropDestination(for: NoteItem.self) { droppedItems, location in
+            // Only allow dropping on folders
+            guard item.isFolder, case .folder(let folder) = item else {
+                return false
+            }
+
+            // Move each dropped item to this folder
+            for droppedItem in droppedItems {
+                // Don't allow dropping a folder into itself
+                if droppedItem.id != item.id {
+                    viewModel.moveItem(droppedItem, to: folder)
+                }
+            }
+
+            return true
+        } isTargeted: { isTargeted in
+            self.isTargeted = isTargeted
         }
         .alert("Rename \(item.isFolder ? "Folder" : "Note")", isPresented: $showingRenameAlert) {
             TextField("Name", text: $newName)
