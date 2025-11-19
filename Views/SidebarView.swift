@@ -13,8 +13,6 @@ struct SidebarView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
 
-            Divider()
-
             // Notes list
             if viewModel.isLoading {
                 Spacer()
