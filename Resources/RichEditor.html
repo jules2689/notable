@@ -630,6 +630,29 @@
                 }
             });
 
+            // Convert task lists from marked.js format to our format
+            // Marked.js renders task lists as: <ul><li><input type="checkbox" disabled> text</li></ul>
+            // We need: <ul class="task-list"><li><input type="checkbox"> text</li></ul>
+            editor.querySelectorAll('ul').forEach(ul => {
+                const firstLi = ul.querySelector('li');
+                if (firstLi) {
+                    const checkbox = firstLi.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        // This is a task list
+                        ul.classList.add('task-list');
+                        // Remove disabled attribute and make checkboxes interactive
+                        ul.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                            cb.removeAttribute('disabled');
+                            // Check if the list item should be marked as checked
+                            const li = cb.closest('li');
+                            if (cb.checked && li) {
+                                li.classList.add('checked');
+                            }
+                        });
+                    }
+                }
+            });
+
             // Initialize iframes and maps after HTML is in the DOM
             setTimeout(() => {
                 initializeIframes();
@@ -780,9 +803,31 @@
             // Callouts: simple pattern
             html = html.replace(/<div class="callout (\w+)">([^<]+)<\/div>/g, '{% callout $1 | $2 %}');
 
-            // Convert task list checkboxes
-            html = html.replace(/<li><input type="checkbox" checked>/g, '<li>- [x] ');
-            html = html.replace(/<li><input type="checkbox">/g, '<li>- [ ] ');
+            // Convert task list items to markdown format BEFORE turndown processes them
+            // Task lists have structure: <ul class="task-list"><li><input type="checkbox"> text</li></ul>
+            // We need to convert this to: <ul><li>- [ ] text</li></ul> or <ul><li>- [x] text</li></ul>
+            clone.querySelectorAll('ul.task-list').forEach(ul => {
+                ul.querySelectorAll('li').forEach(li => {
+                    const checkbox = li.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        const isChecked = checkbox.checked;
+                        // Get all text content of the li (this includes text after checkbox)
+                        // The checkbox itself doesn't contribute to textContent
+                        let textContent = li.textContent || '';
+                        // Remove any leading whitespace
+                        textContent = textContent.trim();
+                        
+                        // Replace the list item content with markdown format
+                        const markdownPrefix = isChecked ? '- [x] ' : '- [ ] ';
+                        li.innerHTML = markdownPrefix + (textContent || '');
+                    }
+                });
+                // Remove task-list class from parent so turndown treats it as regular list
+                ul.classList.remove('task-list');
+            });
+
+            // Update html from the modified clone
+            html = clone.innerHTML;
 
             return turndownService.turndown(html);
         }
@@ -1124,6 +1169,62 @@
 
                 const textContent = node.textContent || '';
 
+                // Convert existing list item to task list: check if we're in a <li> and text starts with [ ] or [x]
+                const listItem = node.closest('li');
+                if (listItem && !listItem.closest('.task-list')) {
+                    // Check if the list item text starts with [ ] or [x]
+                    const listItemText = listItem.textContent || '';
+                    const taskListMatch = listItemText.match(/^\[([ xX])\]\s+(.+?)(\s|$)/);
+                    if (taskListMatch) {
+                        const checked = taskListMatch[1].toLowerCase() === 'x';
+                        const content = taskListMatch[2];
+                        const trailingSpace = taskListMatch[3] || '';
+                        const after = listItemText.substring(taskListMatch[0].length);
+
+                        // Get the parent <ul> or <ol>
+                        const parentList = listItem.parentElement;
+                        if (parentList && (parentList.tagName === 'UL' || parentList.tagName === 'OL')) {
+                            // Convert to task list
+                            parentList.className = 'task-list';
+                            
+                            // Update the list item
+                            if (checked) {
+                                listItem.classList.add('checked');
+                            } else {
+                                listItem.classList.remove('checked');
+                            }
+                            
+                            // Remove existing content and add checkbox
+                            listItem.innerHTML = '';
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.checked = checked;
+                            listItem.appendChild(checkbox);
+                            
+                            // Add the content
+                            if (after) {
+                                listItem.appendChild(document.createTextNode(' ' + content + trailingSpace + after));
+                                // Place cursor after the space in the content
+                                const newRange = document.createRange();
+                                if (listItem.childNodes.length > 1 && listItem.childNodes[1].nodeType === Node.TEXT_NODE) {
+                                    const textNode = listItem.childNodes[1];
+                                    const cursorPos = content.length + trailingSpace.length;
+                                    newRange.setStart(textNode, cursorPos);
+                                    newRange.collapse(true);
+                                    selection.removeAllRanges();
+                                    selection.addRange(newRange);
+                                }
+                            } else {
+                                listItem.appendChild(document.createTextNode(' ' + content));
+                                placeCursorAtEnd(listItem);
+                            }
+                            
+                            notifyChange();
+                            return;
+                        }
+                    }
+                }
+
                 // Headings: ## text (requires space after ##)
                 const headingMatch = textContent.match(/^(#{1,6})\s+(.+)$/);
                 if (headingMatch) {
@@ -1193,24 +1294,15 @@
                     return;
                 }
 
-                // Unordered list: - item or * item
-                const listMatch = textContent.match(/^[-*]\s+(.+)$/);
-                if (listMatch && !textContent.match(/^-\s+\[[ xX]\]/)) {
-                    const content = listMatch[1];
-                    const ul = document.createElement('ul');
-                    const li = document.createElement('li');
-                    li.textContent = content;
-                    ul.appendChild(li);
-                    node.replaceWith(ul);
-                    placeCursorAtEnd(li);
-                    return;
-                }
-
-                // Task list: - [ ] or - [x]
-                const taskMatch = textContent.match(/^-\s+\[([ xX])\]\s+(.+)$/);
+                // Task list: - [ ] or - [x] (check this BEFORE unordered list)
+                // Match with or without trailing space/end
+                const taskMatch = textContent.match(/^-\s+\[([ xX])\]\s+(.+?)(\s|$)/);
                 if (taskMatch) {
                     const checked = taskMatch[1].toLowerCase() === 'x';
                     const content = taskMatch[2];
+                    const trailingSpace = taskMatch[3] || '';
+                    const after = textContent.substring(taskMatch[0].length);
+
                     const ul = document.createElement('ul');
                     ul.className = 'task-list';
                     const li = document.createElement('li');
@@ -1220,6 +1312,45 @@
                     checkbox.checked = checked;
                     li.appendChild(checkbox);
                     li.appendChild(document.createTextNode(' ' + content));
+                    ul.appendChild(li);
+                    
+                    // If there's content after, we need to preserve it
+                    if (after) {
+                        const wrapper = document.createElement('div');
+                        wrapper.appendChild(ul);
+                        wrapper.appendChild(document.createTextNode(trailingSpace + after));
+                        node.replaceWith(...wrapper.childNodes);
+                        // Place cursor after the space in the text node
+                        const textNode = wrapper.childNodes[1];
+                        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                            const newRange = document.createRange();
+                            newRange.setStart(textNode, trailingSpace.length);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        } else {
+                            placeCursorAfter(ul, trailingSpace.length);
+                        }
+                    } else {
+                        node.replaceWith(ul);
+                        placeCursorAtEnd(li);
+                    }
+                    return;
+                }
+
+                // Unordered list: - item or * item
+                // But skip if it looks like a task list pattern (starts with [ ] or [x])
+                const listMatch = textContent.match(/^[-*]\s+(.+)$/);
+                if (listMatch) {
+                    const content = listMatch[1];
+                    // Don't convert to regular list if it starts with [ ] or [x] (task list pattern)
+                    if (content.match(/^\[[ xX]\]/)) {
+                        // This will be handled by the task list pattern above
+                        return;
+                    }
+                    const ul = document.createElement('ul');
+                    const li = document.createElement('li');
+                    li.textContent = content;
                     ul.appendChild(li);
                     node.replaceWith(ul);
                     placeCursorAtEnd(li);
@@ -2084,7 +2215,7 @@
                 return;
             }
 
-            // Handle Enter key in special blocks
+            // Handle Enter key in special blocks and task lists
             if (e.key === 'Enter') {
                 const selection = window.getSelection();
                 if (!selection.rangeCount) return;
@@ -2095,6 +2226,55 @@
                 // Walk up the tree to find the parent element
                 while (node && node.nodeType === Node.TEXT_NODE) {
                     node = node.parentNode;
+                }
+
+                // Check if we're in a task list item
+                const taskListItem = node.closest('li');
+                const taskList = taskListItem ? taskListItem.closest('ul.task-list') : null;
+                
+                if (taskList && taskListItem) {
+                    e.preventDefault();
+                    
+                    if (e.shiftKey) {
+                        // Shift+Enter: Exit the task list
+                        const newP = document.createElement('p');
+                        newP.innerHTML = '<br>';
+                        taskList.insertAdjacentElement('afterend', newP);
+                        
+                        const newRange = document.createRange();
+                        newRange.setStart(newP, 0);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                        
+                        notifyChange();
+                        return;
+                    }
+                    
+                    // Regular Enter: Create a new task list item
+                    const newLi = document.createElement('li');
+                    const newCheckbox = document.createElement('input');
+                    newCheckbox.type = 'checkbox';
+                    newCheckbox.checked = false;
+                    newLi.appendChild(newCheckbox);
+                    newLi.appendChild(document.createTextNode(' '));
+                    
+                    // Insert after current list item
+                    if (taskListItem.nextSibling) {
+                        taskList.insertBefore(newLi, taskListItem.nextSibling);
+                    } else {
+                        taskList.appendChild(newLi);
+                    }
+                    
+                    // Place cursor in the new list item
+                    const newRange = document.createRange();
+                    newRange.setStart(newLi.childNodes[1], 1); // After the space
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                    
+                    notifyChange();
+                    return;
                 }
 
                 // Check if we're in a special block (walk up to be sure)
