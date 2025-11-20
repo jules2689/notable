@@ -88,12 +88,6 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Picker("Storage Location", selection: $storageType) {
                             Text("Default").tag(StorageLocationType.default)
-                            if storageManager.isICloudAvailable {
-                                Text("iCloud").tag(StorageLocationType.iCloud)
-                            } else {
-                                Text("iCloud (Not Available)").tag(StorageLocationType.iCloud)
-                                    .disabled(true)
-                            }
                             Text("Custom Location").tag(StorageLocationType.custom)
                         }
                         .pickerStyle(.segmented)
@@ -125,12 +119,6 @@ struct SettingsView: View {
                             Text(storageManager.rootURL.path)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-                        
-                        if storageType == .iCloud && !storageManager.isICloudAvailable {
-                            Text("iCloud is not available. Please sign in to iCloud in System Settings.")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
                         }
                     }
                 }

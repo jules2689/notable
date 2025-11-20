@@ -3,7 +3,6 @@ import Foundation
 /// Represents different storage location options for notes
 enum StorageLocationType: String, Codable {
     case `default` = "default"
-    case iCloud = "iCloud"
     case custom = "custom"
 }
 
@@ -23,9 +22,16 @@ final class StorageLocationManager: @unchecked Sendable {
     /// Gets the current storage location type from user defaults
     var storageType: StorageLocationType {
         get {
-            if let rawValue = UserDefaults.standard.string(forKey: storageTypeKey),
-               let type = StorageLocationType(rawValue: rawValue) {
-                return type
+            if let rawValue = UserDefaults.standard.string(forKey: storageTypeKey) {
+                // Migrate old iCloud selection to default
+                if rawValue == "iCloud" {
+                    // Update stored value to default
+                    UserDefaults.standard.set(StorageLocationType.default.rawValue, forKey: storageTypeKey)
+                    return .default
+                }
+                if let type = StorageLocationType(rawValue: rawValue) {
+                    return type
+                }
             }
             return .default
         }
@@ -54,16 +60,6 @@ final class StorageLocationManager: @unchecked Sendable {
         case .default:
             return Workspace.defaultNotesURL
             
-        case .iCloud:
-            // Get iCloud Documents directory
-            if let iCloudURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
-                return iCloudURL.appendingPathComponent("Documents", isDirectory: true)
-                    .appendingPathComponent("Notes", isDirectory: true)
-            } else {
-                // Fallback to default if iCloud is not available
-                return Workspace.defaultNotesURL
-            }
-            
         case .custom:
             if let url = resolveCustomURL() {
                 return url
@@ -72,11 +68,6 @@ final class StorageLocationManager: @unchecked Sendable {
                 return Workspace.defaultNotesURL
             }
         }
-    }
-    
-    /// Checks if iCloud is available
-    var isICloudAvailable: Bool {
-        fileManager.url(forUbiquityContainerIdentifier: nil) != nil
     }
     
     /// Sets a custom storage location URL and creates a security-scoped bookmark
