@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import AppKit
 
 /// A rich text editor using contenteditable HTML with markdown support
 struct RichTextEditor: NSViewRepresentable {
@@ -13,6 +14,8 @@ struct RichTextEditor: NSViewRepresentable {
         // Register message handlers
         contentController.add(context.coordinator, name: "ready")
         contentController.add(context.coordinator, name: "textChange")
+        contentController.add(context.coordinator, name: "openLink")
+        contentController.add(context.coordinator, name: "openLinkInWebView")
 
         config.userContentController = contentController
 
@@ -104,9 +107,95 @@ struct RichTextEditor: NSViewRepresentable {
         var lastSetText: String = ""
         var lastReceivedText: String = ""
         var pendingText: String? = nil
+        
+        // Store webview window data to keep them alive
+        private final class WebViewWindowData: @unchecked Sendable {
+            let windowController: NSWindowController
+            let webView: WKWebView
+            let navigationDelegate: WebViewNavigationDelegate
+            
+            init(windowController: NSWindowController, webView: WKWebView, navigationDelegate: WebViewNavigationDelegate) {
+                self.windowController = windowController
+                self.webView = webView
+                self.navigationDelegate = navigationDelegate
+            }
+        }
+        
+        private var webviewWindows: [WebViewWindowData] = []
 
         init(text: Binding<String>) {
             _text = text
+        }
+        
+        func openLinkInWebView(url: URL) {
+            // Create a new window
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = url.absoluteString
+            window.center()
+            
+            // Create container view
+            let containerView = NSView(frame: window.contentView!.bounds)
+            containerView.autoresizingMask = [.width, .height]
+            
+            // Create webview
+            let webView = WKWebView(frame: containerView.bounds)
+            webView.autoresizingMask = [.width, .height]
+            
+            // Create a separate navigation delegate to avoid retain cycles
+            let navigationDelegate = WebViewNavigationDelegate()
+            webView.navigationDelegate = navigationDelegate
+            
+            // Add webview to container
+            containerView.addSubview(webView)
+            
+            // Set container as window content view
+            window.contentView = containerView
+            
+            // Create window controller to manage the window lifecycle
+            let windowController = NSWindowController(window: window)
+            
+            // Store all references together
+            let windowData = WebViewWindowData(
+                windowController: windowController,
+                webView: webView,
+                navigationDelegate: navigationDelegate
+            )
+            webviewWindows.append(windowData)
+            
+            // Clean up when window closes
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self = self else { return }
+                if let window = notification.object as? NSWindow {
+                    // Find and remove the window data
+                    self.webviewWindows.removeAll { $0.windowController.window == window }
+                }
+            }
+            
+            // Load the URL after everything is set up
+            webView.load(URLRequest(url: url))
+            
+            // Show window using the controller
+            windowController.showWindow(nil)
+        }
+        
+        deinit {
+            // Clean up all windows on main thread
+            let windowsToClose = webviewWindows
+            Task { @MainActor in
+                for windowData in windowsToClose {
+                    windowData.webView.navigationDelegate = nil
+                    windowData.windowController.close()
+                }
+            }
         }
         
         /// Safely escape a string for use in JavaScript by using JSON encoding
@@ -189,6 +278,22 @@ struct RichTextEditor: NSViewRepresentable {
                     text = markdown
                     onTextChange?(markdown)
                 }
+                
+            case "openLink":
+                if let body = message.body as? [String: Any],
+                   let urlString = body["url"] as? String,
+                   let url = URL(string: urlString) {
+                    // Open URL in default system browser
+                    NSWorkspace.shared.open(url)
+                }
+                
+            case "openLinkInWebView":
+                if let body = message.body as? [String: Any],
+                   let urlString = body["url"] as? String,
+                   let url = URL(string: urlString) {
+                    // Open URL in a new webview window
+                    openLinkInWebView(url: url)
+                }
 
             default:
                 break
@@ -201,7 +306,7 @@ struct RichTextEditor: NSViewRepresentable {
             return newText != lastReceivedText && newText != lastSetText
         }
 
-        // WKNavigationDelegate - prevent navigation
+        // WKNavigationDelegate - prevent navigation in the main editor
         @MainActor
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             // Allow initial load
@@ -211,6 +316,14 @@ struct RichTextEditor: NSViewRepresentable {
                 // Block all other navigation (like clicking links)
                 decisionHandler(.cancel)
             }
+        }
+    }
+    
+    // Separate navigation delegate for webview windows to avoid retain cycles
+    private class WebViewNavigationDelegate: NSObject, WKNavigationDelegate {
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Allow all navigation in webview windows
+            decisionHandler(.allow)
         }
     }
 }
