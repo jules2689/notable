@@ -18,6 +18,7 @@
 		AA0009 /* NotesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0010 /* NotesViewModel.swift */; };
 		AA0010 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0011 /* SidebarView.swift */; };
 		AA0011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0012 /* EditorView.swift */; };
+		AA0012 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0013 /* SettingsView.swift */; };
 		AA0021 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0021 /* RichTextEditor.swift */; };
 		AA0022 /* RichEditor.html in Resources */ = {isa = PBXBuildFile; fileRef = BB0022 /* RichEditor.html */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
@@ -37,6 +38,7 @@
 		BB0010 /* NotesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesViewModel.swift; sourceTree = "<group>"; };
 		BB0011 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		BB0012 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		BB0013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BB0021 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		BB0022 /* RichEditor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = RichEditor.html; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -75,6 +77,7 @@
 				BB0002 /* ContentView.swift */,
 				BB0011 /* SidebarView.swift */,
 				BB0012 /* EditorView.swift */,
+				BB0013 /* SettingsView.swift */,
 				BB0021 /* RichTextEditor.swift */,
 			);
 			path = Views;
@@ -217,6 +220,7 @@
 				AA0009 /* NotesViewModel.swift in Sources */,
 				AA0010 /* SidebarView.swift in Sources */,
 				AA0011 /* EditorView.swift in Sources */,
+				AA0012 /* SettingsView.swift in Sources */,
 				AA0021 /* RichTextEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

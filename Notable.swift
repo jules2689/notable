@@ -11,6 +11,10 @@ struct Notable: App {
             CommandGroup(replacing: .newItem) {
                 NewNoteButton()
             }
+            
+            CommandGroup(after: .appSettings) {
+                SettingsButton()
+            }
         }
     }
 }
@@ -24,5 +28,17 @@ struct NewNoteButton: View {
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(viewModel == nil)
+    }
+}
+
+struct SettingsButton: View {
+    @FocusedValue(\.showingSettings) private var showingSettings: Binding<Bool>?
+
+    var body: some View {
+        Button("Settings...") {
+            showingSettings?.wrappedValue = true
+        }
+        .keyboardShortcut(",", modifiers: .command)
+        .disabled(showingSettings == nil)
     }
 }
