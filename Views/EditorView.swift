@@ -83,7 +83,9 @@ struct EditorView: View {
                                     // Only rename if title actually changed and is not empty
                                     let trimmedTitle = newTitle.trimmingCharacters(in: .whitespaces)
                                     if !trimmedTitle.isEmpty && trimmedTitle != note.title {
-                                        viewModel.renameNote(note, to: trimmedTitle)
+                                        Task {
+                                            await viewModel.renameNote(note, to: trimmedTitle)
+                                        }
                                     }
                                     pendingTitle = "" // Clear pending after rename attempt
                                 }
@@ -99,7 +101,9 @@ struct EditorView: View {
                         if let note = viewModel.currentNote,
                            !pendingTitle.trimmingCharacters(in: .whitespaces).isEmpty,
                            pendingTitle != note.title {
-                            viewModel.renameNote(note, to: pendingTitle)
+                            Task {
+                                await viewModel.renameNote(note, to: pendingTitle)
+                            }
                             pendingTitle = "" // Clear pending after rename
                         }
                     }
@@ -115,7 +119,9 @@ struct EditorView: View {
                 if viewModel.currentNote != nil {
                     if editedContent != lastSavedContent {
                         Button {
-                            saveNote()
+                            Task {
+                                await saveNote()
+                            }
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "circle.fill")
@@ -156,14 +162,12 @@ struct EditorView: View {
             // Check if task was cancelled
             guard !Task.isCancelled else { return }
 
-            // Perform auto-save on main actor
-            await MainActor.run {
-                saveNote(isAutoSave: true)
-            }
+            // Perform auto-save
+            await saveNote(isAutoSave: true)
         }
     }
 
-    private func saveNote(isAutoSave: Bool = false) {
+    private func saveNote(isAutoSave: Bool = false) async {
         guard var note = viewModel.currentNote else { return }
 
         // Don't save if content hasn't changed
@@ -171,7 +175,7 @@ struct EditorView: View {
 
         note.content = editedContent
         viewModel.currentNote = note
-        viewModel.saveCurrentNote()
+        await viewModel.saveCurrentNote()
 
         // Update last saved content
         lastSavedContent = editedContent

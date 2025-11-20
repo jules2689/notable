@@ -56,6 +56,9 @@ struct ContentView: View {
         }
         .focusedValue(\.notesViewModel, viewModel)
         .focusedValue(\.showingSettings, $showingSettings)
+        .task {
+            await viewModel.loadNotes()
+        }
     }
 }
 

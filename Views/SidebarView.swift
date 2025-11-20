@@ -10,7 +10,9 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             // Search bar
             SearchBar(text: $searchText, onSearch: { query in
-                viewModel.searchNotes(query: query)
+                Task {
+                    await viewModel.searchNotes(query: query)
+                }
             })
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
@@ -54,17 +56,21 @@ struct SidebarView: View {
          .toolbar {
              ToolbarItem(placement: .primaryAction) {
                  Menu {
-                     Button {
-                         viewModel.createNote(title: "Untitled")
-                     } label: {
-                         Label("New Note", systemImage: "doc.badge.plus")
-                     }
+                    Button {
+                        Task {
+                            await viewModel.createNote(title: "Untitled")
+                        }
+                    } label: {
+                        Label("New Note", systemImage: "doc.badge.plus")
+                    }
 
-                     Button {
-                         viewModel.createFolder(name: "New Folder")
-                     } label: {
-                         Label("New Folder", systemImage: "folder.badge.plus")
-                     }
+                    Button {
+                        Task {
+                            await viewModel.createFolder(name: "New Folder")
+                        }
+                    } label: {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
                  } label: {
                      Label("Add", systemImage: "plus")
                  }
@@ -242,9 +248,13 @@ struct HierarchicalNoteItemRow: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Rename") {
                     if item.isNote, case .note(let note) = item {
-                        viewModel.renameNote(note, to: newName)
+                        Task {
+                            await viewModel.renameNote(note, to: newName)
+                        }
                     } else if item.isFolder, case .folder(let folder) = item {
-                        viewModel.renameFolder(folder, to: newName)
+                        Task {
+                            await viewModel.renameFolder(folder, to: newName)
+                        }
                     }
                 }
             }
@@ -252,9 +262,13 @@ struct HierarchicalNoteItemRow: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
                     if item.isNote, case .note(let note) = item {
-                        viewModel.deleteNote(note)
+                        Task {
+                            await viewModel.deleteNote(note)
+                        }
                     } else if item.isFolder, case .folder(let folder) = item {
-                        viewModel.deleteFolder(folder)
+                        Task {
+                            await viewModel.deleteFolder(folder)
+                        }
                     }
                 }
             } message: {
@@ -299,7 +313,9 @@ struct HierarchicalNoteItemRow: View {
             // Use the dragged item from state (most reliable)
             if let dropped = draggedItem {
                 if !isDescendant(dropped, of: item) {
-                    viewModel.moveItem(dropped, to: targetFolder)
+                    Task {
+                        await viewModel.moveItem(dropped, to: targetFolder)
+                    }
                     draggedItem = nil
                     return true
                 }

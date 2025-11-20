@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Main view model for the notes application
 @Observable
-class NotesViewModel {
+@MainActor
+class NotesViewModel: @unchecked Sendable {
     var fileSystemService: FileSystemService
     var noteItems: [NoteItem] = []
     var selectedNoteItem: NoteItem?
@@ -11,11 +12,10 @@ class NotesViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    private var storageLocationObserver: NSObjectProtocol?
+    nonisolated private var storageLocationObserver: NSObjectProtocol?
     
     init(fileSystemService: FileSystemService = FileSystemService()) {
         self.fileSystemService = fileSystemService
-        loadNotes()
         
         // Listen for storage location changes
         storageLocationObserver = NotificationCenter.default.addObserver(
@@ -23,7 +23,9 @@ class NotesViewModel {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleStorageLocationChange()
+            Task { @MainActor in
+                await self?.handleStorageLocationChange()
+            }
         }
     }
     
@@ -33,23 +35,23 @@ class NotesViewModel {
         }
     }
     
-    private func handleStorageLocationChange() {
+    private func handleStorageLocationChange() async {
         // Update the file system service with new storage location
         fileSystemService.updateStorageLocation()
         // Clear current selection and reload notes
         currentNote = nil
         selectedNoteItem = nil
-        loadNotes()
+        await loadNotes()
     }
 
     // MARK: - Loading
 
-    func loadNotes() {
+    func loadNotes() async {
         isLoading = true
         errorMessage = nil
 
         do {
-            noteItems = try fileSystemService.loadNoteHierarchy()
+            noteItems = try await fileSystemService.loadNoteHierarchy()
             isLoading = false
         } catch {
             errorMessage = "Failed to load notes: \(error.localizedDescription)"
@@ -72,45 +74,45 @@ class NotesViewModel {
 
     // MARK: - Note Operations
 
-    func createNote(title: String, in folder: Folder? = nil) {
+    func createNote(title: String, in folder: Folder? = nil) async {
         do {
             let directoryURL = folder?.fileURL ?? fileSystemService.workspace.rootURL
-            let note = try fileSystemService.createNote(title: title, in: directoryURL)
-            loadNotes()
+            let note = try await fileSystemService.createNote(title: title, in: directoryURL)
+            await loadNotes()
             selectNote(note)
         } catch {
             errorMessage = "Failed to create note: \(error.localizedDescription)"
         }
     }
 
-    func saveCurrentNote() {
+    func saveCurrentNote() async {
         guard let note = currentNote else { return }
 
         do {
             var updatedNote = note
             updatedNote.touch()
-            try fileSystemService.saveNote(updatedNote)
+            try await fileSystemService.saveNote(updatedNote)
             currentNote = updatedNote
-            loadNotes()
+            await loadNotes()
         } catch {
             errorMessage = "Failed to save note: \(error.localizedDescription)"
         }
     }
 
-    func deleteNote(_ note: Note) {
+    func deleteNote(_ note: Note) async {
         do {
-            try fileSystemService.deleteNote(note)
+            try await fileSystemService.deleteNote(note)
             if currentNote?.id == note.id {
                 currentNote = nil
                 selectedNoteItem = nil
             }
-            loadNotes()
+            await loadNotes()
         } catch {
             errorMessage = "Failed to delete note: \(error.localizedDescription)"
         }
     }
 
-    func renameNote(_ note: Note, to newTitle: String) {
+    func renameNote(_ note: Note, to newTitle: String) async {
         // Skip if title hasn't actually changed (after sanitization)
         let sanitizedNewTitle = newTitle.trimmingCharacters(in: .whitespaces)
         if sanitizedNewTitle.isEmpty || sanitizedNewTitle == note.title {
@@ -118,12 +120,12 @@ class NotesViewModel {
         }
         
         do {
-            let renamedNote = try fileSystemService.renameNote(note, to: newTitle)
+            let renamedNote = try await fileSystemService.renameNote(note, to: newTitle)
             // If we got a renamed note back, the rename succeeded - clear any previous error
             if currentNote?.id == note.id {
                 currentNote = renamedNote
             }
-            loadNotes()
+            await loadNotes()
             // Clear error message on success
             errorMessage = nil
         } catch FileSystemError.fileAlreadyExists {
@@ -145,13 +147,13 @@ class NotesViewModel {
                     // File exists at new path - check if it's the same file or if rename succeeded
                     // If rename succeeded, we'll find it in loadNotes(), so don't show error
                     // Just reload to pick up the change
-                    loadNotes()
+                    await loadNotes()
                 } else {
                     errorMessage = "Failed to rename note: A file or folder with that name already exists"
                 }
             } else {
                 // Same file, silently ignore - just reload to ensure state is correct
-                loadNotes()
+                await loadNotes()
             }
         } catch {
             errorMessage = "Failed to rename note: \(error.localizedDescription)"
@@ -160,34 +162,34 @@ class NotesViewModel {
 
     // MARK: - Folder Operations
 
-    func createFolder(name: String, in parentFolder: Folder? = nil) {
+    func createFolder(name: String, in parentFolder: Folder? = nil) async {
         do {
             let directoryURL = parentFolder?.fileURL ?? fileSystemService.workspace.rootURL
-            let folder = try fileSystemService.createFolder(name: name, in: directoryURL)
-            loadNotes()
+            let folder = try await fileSystemService.createFolder(name: name, in: directoryURL)
+            await loadNotes()
             selectFolder(folder)
         } catch {
             errorMessage = "Failed to create folder: \(error.localizedDescription)"
         }
     }
 
-    func deleteFolder(_ folder: Folder) {
+    func deleteFolder(_ folder: Folder) async {
         do {
             try fileSystemService.deleteFolder(folder)
             if let selectedItem = selectedNoteItem, selectedItem.id == folder.id {
                 currentNote = nil
                 selectedNoteItem = nil
             }
-            loadNotes()
+            await loadNotes()
         } catch {
             errorMessage = "Failed to delete folder: \(error.localizedDescription)"
         }
     }
 
-    func renameFolder(_ folder: Folder, to newName: String) {
+    func renameFolder(_ folder: Folder, to newName: String) async {
         do {
             _ = try fileSystemService.renameFolder(folder, to: newName)
-            loadNotes()
+            await loadNotes()
         } catch {
             errorMessage = "Failed to rename folder: \(error.localizedDescription)"
         }
@@ -205,10 +207,10 @@ class NotesViewModel {
 
     // MARK: - Move Operations
 
-    func moveItem(_ item: NoteItem, to folder: Folder) {
+    func moveItem(_ item: NoteItem, to folder: Folder) async {
         do {
             _ = try fileSystemService.moveItem(item, to: folder.fileURL)
-            loadNotes()
+            await loadNotes()
         } catch {
             errorMessage = "Failed to move item: \(error.localizedDescription)"
         }
@@ -216,14 +218,14 @@ class NotesViewModel {
 
     // MARK: - Search
 
-    func searchNotes(query: String) {
+    func searchNotes(query: String) async {
         guard !query.isEmpty else {
-            loadNotes()
+            await loadNotes()
             return
         }
 
         do {
-            let results = try fileSystemService.searchNotes(query: query)
+            let results = try await fileSystemService.searchNotes(query: query)
             noteItems = results.map { .note($0) }
         } catch {
             errorMessage = "Failed to search notes: \(error.localizedDescription)"

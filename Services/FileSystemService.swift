@@ -2,10 +2,12 @@ import Foundation
 
 /// Service responsible for all file system operations for notes and folders
 @Observable
-class FileSystemService {
+@MainActor
+class FileSystemService: @unchecked Sendable {
     private let fileManager = FileManager.default
     var workspace: Workspace
     private let storageManager = StorageLocationManager.shared
+    private var webdavService: WebDAVService?
 
     init(workspace: Workspace? = nil) {
         // Use storage manager to get the root URL
@@ -13,6 +15,21 @@ class FileSystemService {
         self.workspace = workspace ?? Workspace(rootURL: rootURL)
         // Ensure security-scoped access is started
         _ = storageManager.startAccessingSecurityScopedResource()
+        // Initialize WebDAV service if needed
+        updateWebDAVService()
+    }
+    
+    /// Updates WebDAV service configuration
+    private func updateWebDAVService() {
+        if storageManager.storageType == .webdav {
+            webdavService = WebDAVService(
+                serverURL: storageManager.webdavServerURL,
+                username: storageManager.webdavUsername,
+                password: storageManager.webdavPassword
+            )
+        } else {
+            webdavService = nil
+        }
     }
     
     /// Updates the workspace root URL based on current storage location settings
@@ -20,6 +37,8 @@ class FileSystemService {
         // Ensure security-scoped access is started before updating
         ensureSecurityScopedAccess()
         workspace.rootURL = storageManager.rootURL
+        // Update WebDAV service configuration
+        updateWebDAVService()
     }
     
     /// Ensures security-scoped resource access is started (for custom locations)
@@ -30,7 +49,13 @@ class FileSystemService {
     // MARK: - Directory Operations
 
     /// Ensures the notes directory exists
-    func ensureNotesDirectoryExists() throws {
+    func ensureNotesDirectoryExists() async throws {
+        if storageManager.storageType == .webdav {
+            // For WebDAV, ensure the Notes directory exists on the server
+            try await ensureWebDAVDirectoryExists()
+            return
+        }
+        
         // Ensure security-scoped access is started
         ensureSecurityScopedAccess()
         
@@ -42,13 +67,147 @@ class FileSystemService {
             )
         }
     }
+    
+    /// Ensures WebDAV directory exists
+    private func ensureWebDAVDirectoryExists() async throws {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToCreateFolder
+        }
+        
+        let webdavCapture = webdav
+        
+        try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    try await webdavCapture.createDirectory(at: "Notes")
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
     /// Loads the entire note hierarchy from the workspace root
-    func loadNoteHierarchy() throws -> [NoteItem] {
+    func loadNoteHierarchy() async throws -> [NoteItem] {
+        if storageManager.storageType == .webdav {
+            return try await loadWebDAVItems()
+        }
+        
         // Ensure security-scoped access is started
         _ = storageManager.startAccessingSecurityScopedResource()
-        try ensureNotesDirectoryExists()
+        try await ensureNotesDirectoryExists()
         return try loadItems(at: workspace.rootURL)
+    }
+    
+    /// Loads items from WebDAV
+    private func loadWebDAVItems() async throws -> [NoteItem] {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToCreateFolder
+        }
+        
+        // Ensure directory exists first (synchronously)
+        try await ensureWebDAVDirectoryExists()
+        
+        let webdavCapture = webdav
+        
+        let webdavItems = try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    let items = try await webdavCapture.listDirectory(at: "Notes")
+                    continuation.resume(returning: items)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        
+        // Convert items synchronously after getting them from WebDAV
+        return try await convertWebDAVItemsToNoteItems(webdavItems, basePath: "Notes")
+    }
+    
+    /// Converts WebDAV items to NoteItems
+    private func convertWebDAVItemsToNoteItems(_ webdavItems: [WebDAVItem], basePath: String) async throws -> [NoteItem] {
+        var noteItems: [NoteItem] = []
+        
+        for item in webdavItems {
+            // Skip the base path itself
+            let normalizedPath = item.path.hasPrefix("/") ? String(item.path.dropFirst()) : item.path
+            let normalizedBase = basePath.hasPrefix("/") ? String(basePath.dropFirst()) : basePath
+            
+            if normalizedPath == normalizedBase || normalizedPath == basePath || item.path == "/\(basePath)" {
+                continue
+            }
+            
+            // Extract relative path from basePath
+            var relativePath = normalizedPath
+            if normalizedPath.hasPrefix(normalizedBase) {
+                relativePath = String(normalizedPath.dropFirst(normalizedBase.count))
+                if relativePath.hasPrefix("/") {
+                    relativePath = String(relativePath.dropFirst())
+                }
+            }
+            
+            // Create a virtual URL for the item
+            let virtualURL = storageManager.rootURL.appendingPathComponent(relativePath)
+            
+            if item.isDirectory {
+                // Create folder
+                let folder = Folder(
+                    name: item.name,
+                    fileURL: virtualURL,
+                    children: [],
+                    createdAt: item.lastModified ?? Date(),
+                    modifiedAt: item.lastModified ?? Date()
+                )
+                noteItems.append(.folder(folder))
+            } else if item.name.hasSuffix(".md") {
+                // Load note content
+                if let note = try await loadWebDAVNote(path: item.path, virtualURL: virtualURL) {
+                    noteItems.append(.note(note))
+                }
+            }
+        }
+        
+        // Sort: folders first, then notes, alphabetically
+        return noteItems.sorted { item1, item2 in
+            if item1.isFolder && !item2.isFolder {
+                return true
+            } else if !item1.isFolder && item2.isFolder {
+                return false
+            } else {
+                return item1.name.localizedStandardCompare(item2.name) == .orderedAscending
+            }
+        }
+    }
+    
+    /// Loads a note from WebDAV
+    private func loadWebDAVNote(path: String, virtualURL: URL) async throws -> Note? {
+        guard let webdav = webdavService else { return nil }
+        
+        let webdavCapture = webdav
+        let pathCapture = path
+        
+        let data = try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    let data = try await webdavCapture.downloadFile(from: pathCapture)
+                    continuation.resume(returning: data)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        
+        guard let content = String(data: data, encoding: .utf8) else { return nil }
+        
+        return Note(
+            title: virtualURL.deletingPathExtension().lastPathComponent,
+            content: content,
+            fileURL: virtualURL,
+            createdAt: Date(),
+            modifiedAt: Date()
+        )
     }
 
     /// Recursively loads notes and folders from a directory
@@ -101,7 +260,12 @@ class FileSystemService {
     // MARK: - Note Operations
 
     /// Saves a note to disk
-    func saveNote(_ note: Note) throws {
+    func saveNote(_ note: Note) async throws {
+        if storageManager.storageType == .webdav {
+            try await saveWebDAVNote(note)
+            return
+        }
+        
         ensureSecurityScopedAccess()
         try note.content.write(to: note.fileURL, atomically: true, encoding: .utf8)
 
@@ -111,12 +275,135 @@ class FileSystemService {
             ofItemAtPath: note.fileURL.path
         )
     }
+    
+    /// Saves a note to WebDAV
+    private func saveWebDAVNote(_ note: Note) async throws {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToCreateNote
+        }
+        
+        // Convert virtual URL to WebDAV path
+        let webdavPath = getWebDAVPath(from: note.fileURL)
+        let data = note.content.data(using: .utf8) ?? Data()
+        
+        let webdavCapture = webdav
+        let dataCapture = data
+        let pathCapture = webdavPath
+        
+        try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    try await webdavCapture.uploadFile(data: dataCapture, to: pathCapture)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    /// Converts a virtual URL to WebDAV path
+    private func getWebDAVPath(from url: URL) -> String {
+        // Get the path component relative to rootURL
+        let rootPath = storageManager.rootURL.path
+        let itemPath = url.path
+        
+        // Extract relative path
+        var relativePath = itemPath
+        if itemPath.hasPrefix(rootPath) {
+            relativePath = String(itemPath.dropFirst(rootPath.count))
+            if relativePath.hasPrefix("/") {
+                relativePath = String(relativePath.dropFirst())
+            }
+        }
+        
+        // Build WebDAV path
+        var webdavPath = "Notes"
+        if !relativePath.isEmpty {
+            webdavPath += "/" + relativePath
+        }
+        
+        return webdavPath.replacingOccurrences(of: "//", with: "/")
+    }
+    
+    /// Creates a new note in WebDAV
+    private func createWebDAVNote(title: String, in directory: URL?) async throws -> Note {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToCreateNote
+        }
+        
+        let parentURL = directory ?? workspace.rootURL
+        let sanitizedTitle = sanitizeFilename(title)
+        var filename = "\(sanitizedTitle).md"
+        var fileURL = parentURL.appendingPathComponent(filename)
+        var webdavPath = getWebDAVPath(from: fileURL)
+        
+        // Check for existing files and make unique
+        var counter = 1
+        var foundUnique = false
+        
+        while !foundUnique {
+            let webdavCapture = webdav
+            let pathCapture = webdavPath
+            
+            let exists = try await withCheckedThrowingContinuation { continuation in
+                Task { @Sendable in
+                    do {
+                        _ = try await webdavCapture.downloadFile(from: pathCapture)
+                        // File exists, try next
+                        continuation.resume(returning: true)
+                    } catch {
+                        // File doesn't exist, we can use this name
+                        continuation.resume(returning: false)
+                    }
+                }
+            }
+            
+            if !exists {
+                foundUnique = true
+            } else {
+                filename = "\(sanitizedTitle)-\(counter).md"
+                fileURL = parentURL.appendingPathComponent(filename)
+                webdavPath = getWebDAVPath(from: fileURL)
+                counter += 1
+            }
+        }
+        
+        // Create empty file
+        let initialContent = Data()
+        let webdavCapture = webdav
+        let contentCapture = initialContent
+        let pathCapture = webdavPath
+        
+        try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    try await webdavCapture.uploadFile(data: contentCapture, to: pathCapture)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        
+        return Note(
+            title: sanitizedTitle,
+            content: "",
+            fileURL: fileURL,
+            createdAt: Date(),
+            modifiedAt: Date()
+        )
+    }
 
     /// Creates a new note with the given title in the specified directory
-    func createNote(title: String, in directory: URL? = nil) throws -> Note {
+    func createNote(title: String, in directory: URL? = nil) async throws -> Note {
+        if storageManager.storageType == .webdav {
+            return try await createWebDAVNote(title: title, in: directory)
+        }
+        
         ensureSecurityScopedAccess()
         let parentURL = directory ?? workspace.rootURL
-        try ensureNotesDirectoryExists()
+        try await ensureNotesDirectoryExists()
 
         // Sanitize filename
         let sanitizedTitle = sanitizeFilename(title)
@@ -143,13 +430,100 @@ class FileSystemService {
     }
 
     /// Deletes a note from disk
-    func deleteNote(_ note: Note) throws {
+    func deleteNote(_ note: Note) async throws {
+        if storageManager.storageType == .webdav {
+            try await deleteWebDAVItem(note.fileURL)
+            return
+        }
+        
         ensureSecurityScopedAccess()
         try fileManager.removeItem(at: note.fileURL)
     }
+    
+    /// Deletes an item from WebDAV
+    private func deleteWebDAVItem(_ url: URL) async throws {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToCreateNote
+        }
+        
+        let webdavPath = getWebDAVPath(from: url)
+        let webdavCapture = webdav
+        let pathCapture = webdavPath
+        
+        try await withCheckedThrowingContinuation { continuation in
+            Task { @Sendable in
+                do {
+                    try await webdavCapture.deleteItem(at: pathCapture)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    /// Renames a note in WebDAV
+    private func renameWebDAVNote(_ note: Note, to newTitle: String) async throws -> Note {
+        guard let webdav = webdavService else {
+            throw FileSystemError.failedToRenameNote
+        }
+        
+        let sanitizedTitle = sanitizeFilename(newTitle)
+        let newFilename = "\(sanitizedTitle).md"
+        let newURL = note.fileURL.deletingLastPathComponent().appendingPathComponent(newFilename)
+        
+        // Get current filename without extension for comparison
+        let currentFilename = note.fileURL.lastPathComponent
+        let currentNameWithoutExt = currentFilename.replacingOccurrences(of: ".md", with: "", options: .caseInsensitive)
+        
+        // If the sanitized new title matches the current filename (case-insensitive), no rename is needed
+        if sanitizedTitle.caseInsensitiveCompare(currentNameWithoutExt) == .orderedSame {
+            return note
+        }
+        
+        let sourcePath = getWebDAVPath(from: note.fileURL)
+        let destinationPath = getWebDAVPath(from: newURL)
+        
+        let webdavCapture = webdav
+        let sourceCapture = sourcePath
+        let destCapture = destinationPath
+        
+        do {
+            try await withCheckedThrowingContinuation { continuation in
+                Task { @Sendable in
+                    do {
+                        try await webdavCapture.moveItem(from: sourceCapture, to: destCapture)
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        } catch let error as WebDAVError {
+            if case .fileAlreadyExists = error {
+                throw FileSystemError.fileAlreadyExists
+            }
+            throw error
+        }
+        
+        // Create a new note object with the updated URL, preserving the ID
+        return Note(
+            id: note.id,
+            title: sanitizedTitle,
+            content: note.content,
+            fileURL: newURL,
+            createdAt: note.createdAt,
+            modifiedAt: note.modifiedAt,
+            tags: note.tags
+        )
+    }
 
     /// Renames a note
-    func renameNote(_ note: Note, to newTitle: String) throws -> Note {
+    func renameNote(_ note: Note, to newTitle: String) async throws -> Note {
+        if storageManager.storageType == .webdav {
+            return try await renameWebDAVNote(note, to: newTitle)
+        }
+        
         ensureSecurityScopedAccess()
         let sanitizedTitle = sanitizeFilename(newTitle)
         let newFilename = "\(sanitizedTitle).md"
@@ -224,10 +598,10 @@ class FileSystemService {
     // MARK: - Folder Operations
 
     /// Creates a new folder in the specified directory
-    func createFolder(name: String, in directory: URL? = nil) throws -> Folder {
+    func createFolder(name: String, in directory: URL? = nil) async throws -> Folder {
         ensureSecurityScopedAccess()
         let parentURL = directory ?? workspace.rootURL
-        try ensureNotesDirectoryExists()
+        try await ensureNotesDirectoryExists()
 
         let sanitizedName = sanitizeFilename(name)
         var folderURL = parentURL.appendingPathComponent(sanitizedName, isDirectory: true)
@@ -300,8 +674,8 @@ class FileSystemService {
     // MARK: - Search Operations
 
     /// Searches all notes for the given query
-    func searchNotes(query: String) throws -> [Note] {
-        let items = try loadNoteHierarchy()
+    func searchNotes(query: String) async throws -> [Note] {
+        let items = try await loadNoteHierarchy()
         let lowercasedQuery = query.lowercased()
 
         var results: [Note] = []
