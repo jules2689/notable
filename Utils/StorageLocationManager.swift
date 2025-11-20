@@ -4,6 +4,7 @@ import Foundation
 enum StorageLocationType: String, Codable {
     case `default` = "default"
     case custom = "custom"
+    case webdav = "webdav"
 }
 
 /// Manages storage location preferences and provides the appropriate root URL
@@ -14,6 +15,9 @@ final class StorageLocationManager: @unchecked Sendable {
     private let storageTypeKey = "storageLocationType"
     private let customPathKey = "customStoragePath"
     private let customBookmarkKey = "customStorageBookmark"
+    private let webdavServerURLKey = "webdavServerURL"
+    private let webdavUsernameKey = "webdavUsername"
+    private let webdavPasswordKey = "webdavPassword"
     
     // Track if we're currently accessing the security-scoped resource
     private var isAccessingSecurityScopedResource = false
@@ -41,6 +45,10 @@ final class StorageLocationManager: @unchecked Sendable {
                 // Clear bookmark when switching away from custom
                 clearCustomBookmark()
             }
+            if newValue != .webdav {
+                // Clear WebDAV credentials when switching away from WebDAV
+                clearWebDAVCredentials()
+            }
         }
     }
     
@@ -67,7 +75,76 @@ final class StorageLocationManager: @unchecked Sendable {
                 // Fallback to default if no custom path is set
                 return Workspace.defaultNotesURL
             }
+            
+        case .webdav:
+            // For WebDAV, return a virtual URL representing the WebDAV path
+            if let serverURL = webdavServerURL {
+                return serverURL.appendingPathComponent("Notes", isDirectory: true)
+            }
+            return Workspace.defaultNotesURL
         }
+    }
+    
+    // MARK: - WebDAV Configuration
+    
+    /// WebDAV server URL
+    var webdavServerURL: URL? {
+        get {
+            if let urlString = UserDefaults.standard.string(forKey: webdavServerURLKey) {
+                return URL(string: urlString)
+            }
+            return nil
+        }
+        set {
+            if let url = newValue {
+                UserDefaults.standard.set(url.absoluteString, forKey: webdavServerURLKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: webdavServerURLKey)
+            }
+        }
+    }
+    
+    /// WebDAV username
+    var webdavUsername: String? {
+        get {
+            UserDefaults.standard.string(forKey: webdavUsernameKey)
+        }
+        set {
+            if let username = newValue {
+                UserDefaults.standard.set(username, forKey: webdavUsernameKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: webdavUsernameKey)
+            }
+        }
+    }
+    
+    /// WebDAV password (stored in UserDefaults)
+    var webdavPassword: String? {
+        get {
+            UserDefaults.standard.string(forKey: webdavPasswordKey)
+        }
+        set {
+            if let password = newValue {
+                UserDefaults.standard.set(password, forKey: webdavPasswordKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: webdavPasswordKey)
+            }
+        }
+    }
+    
+    /// Sets WebDAV configuration
+    func setWebDAVConfiguration(serverURL: URL, username: String, password: String) {
+        self.webdavServerURL = serverURL
+        self.webdavUsername = username
+        self.webdavPassword = password
+        self.storageType = .webdav
+    }
+    
+    /// Clears WebDAV credentials
+    private func clearWebDAVCredentials() {
+        UserDefaults.standard.removeObject(forKey: webdavServerURLKey)
+        UserDefaults.standard.removeObject(forKey: webdavUsernameKey)
+        UserDefaults.standard.removeObject(forKey: webdavPasswordKey)
     }
     
     /// Sets a custom storage location URL and creates a security-scoped bookmark

@@ -43,9 +43,16 @@ struct SettingsView: View {
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
     @State private var storageType: StorageLocationType = StorageLocationManager.shared.storageType
     @State private var customPath: String = StorageLocationManager.shared.customPath ?? ""
+    @State private var webdavServerURL: String = StorageLocationManager.shared.webdavServerURL?.absoluteString ?? ""
+    @State private var webdavUsername: String = StorageLocationManager.shared.webdavUsername ?? ""
+    @State private var webdavPassword: String = ""
     @State private var showingDirectoryPicker = false
     @State private var needsReload = false
     @State private var errorMessage: String?
+    @State private var successMessage: String?
+    @State private var isTestingConnection = false
+    @State private var connectionTestResult: String?
+    @State private var connectionTestColor: Color = .red
     @Environment(\.dismiss) private var dismiss
     
     private let storageManager = StorageLocationManager.shared
@@ -89,6 +96,7 @@ struct SettingsView: View {
                         Picker("Storage Location", selection: $storageType) {
                             Text("Default").tag(StorageLocationType.default)
                             Text("Custom Location").tag(StorageLocationType.custom)
+                            Text("WebDAV").tag(StorageLocationType.webdav)
                         }
                         .pickerStyle(.segmented)
                         .onChange(of: storageType) { oldValue, newValue in
@@ -115,6 +123,46 @@ struct SettingsView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        } else if storageType == .webdav {
+                            VStack(alignment: .leading, spacing: 8) {
+                                TextField("Server URL", text: $webdavServerURL)
+                                    .textFieldStyle(.roundedBorder)
+                                
+                                TextField("Username", text: $webdavUsername)
+                                    .textFieldStyle(.roundedBorder)
+                                
+                                SecureField("Password", text: $webdavPassword)
+                                    .textFieldStyle(.roundedBorder)
+                                
+                                HStack {
+                                    Button("Test Connection") {
+                                        testWebDAVConnection()
+                                    }
+                                    .disabled(isTestingConnection || webdavServerURL.isEmpty)
+                                    
+                                    if isTestingConnection {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    }
+                                    
+                                    if let result = connectionTestResult {
+                                        Text(result)
+                                            .font(.caption)
+                                            .foregroundStyle(connectionTestColor)
+                                    }
+                                }
+
+                                Button("Save WebDAV Configuration") {
+                                    saveWebDAVConfiguration()
+                                }
+                                .disabled(webdavServerURL.isEmpty || webdavUsername.isEmpty || webdavPassword.isEmpty)
+                                
+                                if let successMessage = successMessage {
+                                    Text(successMessage)
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                            }
                         } else {
                             Text(storageManager.rootURL.path)
                                 .font(.caption)
@@ -124,7 +172,7 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
-            .frame(width: 500, height: 400)
+            .frame(width: 500, height: 550)
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -181,8 +229,85 @@ struct SettingsView: View {
         .onAppear {
             storageType = storageManager.storageType
             customPath = storageManager.customPath ?? ""
+            webdavServerURL = storageManager.webdavServerURL?.absoluteString ?? ""
+            webdavUsername = storageManager.webdavUsername ?? ""
+            // Don't load password from keychain in UI for security
         }
     }
+    
+    private func testWebDAVConnection() {
+        guard let serverURL = URL(string: webdavServerURL) else {
+            connectionTestResult = "Invalid server URL"
+            return
+        }
+        
+        isTestingConnection = true
+        connectionTestResult = nil
+        connectionTestColor = .red
+        
+        let testService = WebDAVService(
+            serverURL: serverURL,
+            username: webdavUsername.isEmpty ? nil : webdavUsername,
+            password: webdavPassword.isEmpty ? nil : webdavPassword
+        )
+        
+        Task {
+            do {
+                let success = try await testService.testConnection()
+                await MainActor.run {
+                    isTestingConnection = false
+                    connectionTestResult = success ? "Connection successful!" : "Connection failed"
+                    connectionTestColor = success ? .green : .red
+                }
+            } catch {
+                await MainActor.run {
+                    isTestingConnection = false
+                    connectionTestResult = "Error: \(error.localizedDescription)"
+                    connectionTestColor = .red
+                }
+            }
+        }
+    }
+    
+    private func saveWebDAVConfiguration() {
+        guard let serverURL = URL(string: webdavServerURL) else {
+            errorMessage = "Invalid server URL"
+            successMessage = nil
+            return
+        }
+        
+        guard !webdavUsername.isEmpty, !webdavPassword.isEmpty else {
+            errorMessage = "Username and password are required"
+            successMessage = nil
+            return
+        }
+        
+        storageManager.setWebDAVConfiguration(
+            serverURL: serverURL,
+            username: webdavUsername,
+            password: webdavPassword
+        )
+        
+        successMessage = "WebDAV configuration saved successfully"
+        errorMessage = nil
+        needsReload = true
+        connectionTestResult = nil
+        connectionTestColor = .red
+        // Clear password field after successful save
+        webdavPassword = ""
+    }
+}
+
+extension View {
+    func placeholder<Content: View>(
+        when shouldShow: Bool,
+        alignment: Alignment = .leading,
+        @ViewBuilder placeholder: () -> Content) -> some View {
+            ZStack(alignment: alignment) {
+                placeholder().opacity(shouldShow ? 1 : 0)
+                self
+            }
+        }
 }
 
 struct AppearanceRadioButton: View {
