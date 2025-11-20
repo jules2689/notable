@@ -12,7 +12,7 @@ class NotesViewModel: @unchecked Sendable {
     var isLoading = false
     var errorMessage: String?
 
-    nonisolated private var storageLocationObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var storageLocationObserver: NSObjectProtocol?
     
     init(fileSystemService: FileSystemService = FileSystemService()) {
         self.fileSystemService = fileSystemService

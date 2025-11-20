@@ -74,18 +74,7 @@ class FileSystemService: @unchecked Sendable {
             throw FileSystemError.failedToCreateFolder
         }
         
-        let webdavCapture = webdav
-        
-        try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    try await webdavCapture.createDirectory(at: "Notes")
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await webdav.createDirectory(at: "Notes")
     }
 
     /// Loads the entire note hierarchy from the workspace root
@@ -109,18 +98,7 @@ class FileSystemService: @unchecked Sendable {
         // Ensure directory exists first (synchronously)
         try await ensureWebDAVDirectoryExists()
         
-        let webdavCapture = webdav
-        
-        let webdavItems = try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    let items = try await webdavCapture.listDirectory(at: "Notes")
-                    continuation.resume(returning: items)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let webdavItems = try await webdav.listDirectory(at: "Notes")
         
         // Convert items synchronously after getting them from WebDAV
         return try await convertWebDAVItemsToNoteItems(webdavItems, basePath: "Notes")
@@ -185,19 +163,7 @@ class FileSystemService: @unchecked Sendable {
     private func loadWebDAVNote(path: String, virtualURL: URL) async throws -> Note? {
         guard let webdav = webdavService else { return nil }
         
-        let webdavCapture = webdav
-        let pathCapture = path
-        
-        let data = try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    let data = try await webdavCapture.downloadFile(from: pathCapture)
-                    continuation.resume(returning: data)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let data = try await webdav.downloadFile(from: path)
         
         guard let content = String(data: data, encoding: .utf8) else { return nil }
         
@@ -286,20 +252,7 @@ class FileSystemService: @unchecked Sendable {
         let webdavPath = getWebDAVPath(from: note.fileURL)
         let data = note.content.data(using: .utf8) ?? Data()
         
-        let webdavCapture = webdav
-        let dataCapture = data
-        let pathCapture = webdavPath
-        
-        try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    try await webdavCapture.uploadFile(data: dataCapture, to: pathCapture)
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await webdav.uploadFile(data: data, to: webdavPath)
     }
     
     /// Converts a virtual URL to WebDAV path
@@ -343,20 +296,14 @@ class FileSystemService: @unchecked Sendable {
         var foundUnique = false
         
         while !foundUnique {
-            let webdavCapture = webdav
-            let pathCapture = webdavPath
-            
-            let exists = try await withCheckedThrowingContinuation { continuation in
-                Task { @Sendable in
-                    do {
-                        _ = try await webdavCapture.downloadFile(from: pathCapture)
-                        // File exists, try next
-                        continuation.resume(returning: true)
-                    } catch {
-                        // File doesn't exist, we can use this name
-                        continuation.resume(returning: false)
-                    }
-                }
+            let exists: Bool
+            do {
+                _ = try await webdav.downloadFile(from: webdavPath)
+                // File exists, try next
+                exists = true
+            } catch {
+                // File doesn't exist, we can use this name
+                exists = false
             }
             
             if !exists {
@@ -371,20 +318,7 @@ class FileSystemService: @unchecked Sendable {
         
         // Create empty file
         let initialContent = Data()
-        let webdavCapture = webdav
-        let contentCapture = initialContent
-        let pathCapture = webdavPath
-        
-        try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    try await webdavCapture.uploadFile(data: contentCapture, to: pathCapture)
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await webdav.uploadFile(data: initialContent, to: webdavPath)
         
         return Note(
             title: sanitizedTitle,
@@ -447,19 +381,7 @@ class FileSystemService: @unchecked Sendable {
         }
         
         let webdavPath = getWebDAVPath(from: url)
-        let webdavCapture = webdav
-        let pathCapture = webdavPath
-        
-        try await withCheckedThrowingContinuation { continuation in
-            Task { @Sendable in
-                do {
-                    try await webdavCapture.deleteItem(at: pathCapture)
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await webdav.deleteItem(at: webdavPath)
     }
     
     /// Renames a note in WebDAV
@@ -484,21 +406,8 @@ class FileSystemService: @unchecked Sendable {
         let sourcePath = getWebDAVPath(from: note.fileURL)
         let destinationPath = getWebDAVPath(from: newURL)
         
-        let webdavCapture = webdav
-        let sourceCapture = sourcePath
-        let destCapture = destinationPath
-        
         do {
-            try await withCheckedThrowingContinuation { continuation in
-                Task { @Sendable in
-                    do {
-                        try await webdavCapture.moveItem(from: sourceCapture, to: destCapture)
-                        continuation.resume()
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
+            try await webdav.moveItem(from: sourcePath, to: destinationPath)
         } catch let error as WebDAVError {
             if case .fileAlreadyExists = error {
                 throw FileSystemError.fileAlreadyExists

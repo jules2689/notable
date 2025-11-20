@@ -22,6 +22,8 @@
 		AA0021 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0021 /* RichTextEditor.swift */; };
 		AA0022 /* RichEditor.html in Resources */ = {isa = PBXBuildFile; fileRef = BB0022 /* RichEditor.html */; };
 		AA0023 /* StorageLocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0023 /* StorageLocationManager.swift */; };
+		AA0024 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0024 /* WebDAVService.swift */; };
+		AA0025 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0025 /* KeychainHelper.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -43,6 +45,8 @@
 		BB0021 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		BB0022 /* RichEditor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = RichEditor.html; sourceTree = "<group>"; };
 		BB0023 /* StorageLocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageLocationManager.swift; sourceTree = "<group>"; };
+		BB0024 /* WebDAVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDAVService.swift; sourceTree = "<group>"; };
+		BB0025 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				BB0009 /* FileSystemService.swift */,
+				BB0024 /* WebDAVService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -116,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				BB0023 /* StorageLocationManager.swift */,
+				BB0025 /* KeychainHelper.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -226,6 +232,8 @@
 				AA0012 /* SettingsView.swift in Sources */,
 				AA0021 /* RichTextEditor.swift in Sources */,
 				AA0023 /* StorageLocationManager.swift in Sources */,
+				AA0024 /* WebDAVService.swift in Sources */,
+				AA0025 /* KeychainHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

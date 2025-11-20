@@ -24,7 +24,9 @@ struct NewNoteButton: View {
 
     var body: some View {
         Button("New Note") {
-            viewModel?.createNote(title: "Untitled")
+            Task {
+                await viewModel?.createNote(title: "Untitled")
+            }
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(viewModel == nil)
