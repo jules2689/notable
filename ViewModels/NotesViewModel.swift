@@ -11,8 +11,34 @@ class NotesViewModel {
     var isLoading = false
     var errorMessage: String?
 
+    private var storageLocationObserver: NSObjectProtocol?
+    
     init(fileSystemService: FileSystemService = FileSystemService()) {
         self.fileSystemService = fileSystemService
+        loadNotes()
+        
+        // Listen for storage location changes
+        storageLocationObserver = NotificationCenter.default.addObserver(
+            forName: .storageLocationChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleStorageLocationChange()
+        }
+    }
+    
+    deinit {
+        if let observer = storageLocationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
+    private func handleStorageLocationChange() {
+        // Update the file system service with new storage location
+        fileSystemService.updateStorageLocation()
+        // Clear current selection and reload notes
+        currentNote = nil
+        selectedNoteItem = nil
         loadNotes()
     }
 

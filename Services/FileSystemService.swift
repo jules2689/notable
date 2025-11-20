@@ -5,15 +5,35 @@ import Foundation
 class FileSystemService {
     private let fileManager = FileManager.default
     var workspace: Workspace
+    private let storageManager = StorageLocationManager.shared
 
-    init(workspace: Workspace = .default) {
-        self.workspace = workspace
+    init(workspace: Workspace? = nil) {
+        // Use storage manager to get the root URL
+        let rootURL = storageManager.rootURL
+        self.workspace = workspace ?? Workspace(rootURL: rootURL)
+        // Ensure security-scoped access is started
+        _ = storageManager.startAccessingSecurityScopedResource()
+    }
+    
+    /// Updates the workspace root URL based on current storage location settings
+    func updateStorageLocation() {
+        // Ensure security-scoped access is started before updating
+        ensureSecurityScopedAccess()
+        workspace.rootURL = storageManager.rootURL
+    }
+    
+    /// Ensures security-scoped resource access is started (for custom locations)
+    private func ensureSecurityScopedAccess() {
+        _ = storageManager.startAccessingSecurityScopedResource()
     }
 
     // MARK: - Directory Operations
 
     /// Ensures the notes directory exists
     func ensureNotesDirectoryExists() throws {
+        // Ensure security-scoped access is started
+        ensureSecurityScopedAccess()
+        
         if !fileManager.fileExists(atPath: workspace.rootURL.path) {
             try fileManager.createDirectory(
                 at: workspace.rootURL,
@@ -25,6 +45,8 @@ class FileSystemService {
 
     /// Loads the entire note hierarchy from the workspace root
     func loadNoteHierarchy() throws -> [NoteItem] {
+        // Ensure security-scoped access is started
+        _ = storageManager.startAccessingSecurityScopedResource()
         try ensureNotesDirectoryExists()
         return try loadItems(at: workspace.rootURL)
     }
@@ -80,6 +102,7 @@ class FileSystemService {
 
     /// Saves a note to disk
     func saveNote(_ note: Note) throws {
+        ensureSecurityScopedAccess()
         try note.content.write(to: note.fileURL, atomically: true, encoding: .utf8)
 
         // Update file modification date
@@ -91,6 +114,7 @@ class FileSystemService {
 
     /// Creates a new note with the given title in the specified directory
     func createNote(title: String, in directory: URL? = nil) throws -> Note {
+        ensureSecurityScopedAccess()
         let parentURL = directory ?? workspace.rootURL
         try ensureNotesDirectoryExists()
 
@@ -120,11 +144,13 @@ class FileSystemService {
 
     /// Deletes a note from disk
     func deleteNote(_ note: Note) throws {
+        ensureSecurityScopedAccess()
         try fileManager.removeItem(at: note.fileURL)
     }
 
     /// Renames a note
     func renameNote(_ note: Note, to newTitle: String) throws -> Note {
+        ensureSecurityScopedAccess()
         let sanitizedTitle = sanitizeFilename(newTitle)
         let newFilename = "\(sanitizedTitle).md"
         let newURL = note.fileURL.deletingLastPathComponent().appendingPathComponent(newFilename)
@@ -199,6 +225,7 @@ class FileSystemService {
 
     /// Creates a new folder in the specified directory
     func createFolder(name: String, in directory: URL? = nil) throws -> Folder {
+        ensureSecurityScopedAccess()
         let parentURL = directory ?? workspace.rootURL
         try ensureNotesDirectoryExists()
 
@@ -224,11 +251,13 @@ class FileSystemService {
 
     /// Deletes a folder and all its contents
     func deleteFolder(_ folder: Folder) throws {
+        ensureSecurityScopedAccess()
         try fileManager.removeItem(at: folder.fileURL)
     }
 
     /// Renames a folder
     func renameFolder(_ folder: Folder, to newName: String) throws -> Folder {
+        ensureSecurityScopedAccess()
         let sanitizedName = sanitizeFilename(newName)
         let newURL = folder.fileURL.deletingLastPathComponent().appendingPathComponent(sanitizedName, isDirectory: true)
 
@@ -250,6 +279,7 @@ class FileSystemService {
 
     /// Moves a note or folder to a new directory
     func moveItem(_ item: NoteItem, to destination: URL) throws -> NoteItem {
+        ensureSecurityScopedAccess()
         let itemURL = item.fileURL
         let newURL = destination.appendingPathComponent(itemURL.lastPathComponent)
 

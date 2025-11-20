@@ -21,6 +21,7 @@
 		AA0012 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0013 /* SettingsView.swift */; };
 		AA0021 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0021 /* RichTextEditor.swift */; };
 		AA0022 /* RichEditor.html in Resources */ = {isa = PBXBuildFile; fileRef = BB0022 /* RichEditor.html */; };
+		AA0023 /* StorageLocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0023 /* StorageLocationManager.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +42,7 @@
 		BB0013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		BB0021 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		BB0022 /* RichEditor.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = RichEditor.html; sourceTree = "<group>"; };
+		BB0023 /* StorageLocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageLocationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +115,7 @@
 		FF0005 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				BB0023 /* StorageLocationManager.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -222,6 +225,7 @@
 				AA0011 /* EditorView.swift in Sources */,
 				AA0012 /* SettingsView.swift in Sources */,
 				AA0021 /* RichTextEditor.swift in Sources */,
+				AA0023 /* StorageLocationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
