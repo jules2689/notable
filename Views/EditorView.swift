@@ -20,17 +20,42 @@ struct EditorView: View {
                         scheduleAutoSave()
                     }
                 )
+                .id("\(note.fileURL.path)-\(note.modifiedAt.timeIntervalSince1970)") // Force refresh when note changes
                 .focused($isEditorFocused)
                 .onAppear {
                     editedContent = note.content
                     lastSavedContent = note.content
                     isEditorFocused = true
                 }
-                .onChange(of: note.id) { _, _ in
+                .onChange(of: viewModel.currentNote?.id) { _, _ in
                     // Cancel any pending auto-save when switching notes
                     autoSaveTask?.cancel()
-                    editedContent = note.content
-                    lastSavedContent = note.content
+                    if let note = viewModel.currentNote {
+                        editedContent = note.content
+                        lastSavedContent = note.content
+                    }
+                }
+                .onChange(of: viewModel.currentNote?.fileURL) { _, _ in
+                    // Also watch for file URL changes (e.g., after reload with new ID)
+                    autoSaveTask?.cancel()
+                    if let note = viewModel.currentNote {
+                        editedContent = note.content
+                        lastSavedContent = note.content
+                    }
+                }
+                .onChange(of: viewModel.currentNote) { oldNote, newNote in
+                    // Watch for when the note object itself changes (e.g., after reload)
+                    if let newNote = newNote {
+                        // Always update when note changes (different instance or different content)
+                        // This ensures we get fresh content after reload
+                        autoSaveTask?.cancel()
+                        editedContent = newNote.content
+                        lastSavedContent = newNote.content
+                    } else if oldNote != nil {
+                        // Note was deselected
+                        editedContent = ""
+                        lastSavedContent = ""
+                    }
                 }
             } else {
                 // Empty state

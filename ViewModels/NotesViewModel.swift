@@ -50,13 +50,88 @@ class NotesViewModel: @unchecked Sendable {
         isLoading = true
         errorMessage = nil
 
+        // Preserve the current selection before reloading
+        let previousNoteFileURL = currentNote?.fileURL
+        let previousSelectedItemFileURL = selectedNoteItem?.fileURL
+
         do {
             noteItems = try await fileSystemService.loadNoteHierarchy()
+            
+            // Restore selection after reload by matching file URLs
+            if let previousFileURL = previousNoteFileURL {
+                // Find the note with matching file URL in the newly loaded items
+                if let matchingNote = findNote(by: previousFileURL, in: noteItems) {
+                    // Reload the note directly from disk to ensure we have the absolute latest content
+                    // This is important after saves to ensure we get the saved content
+                    if let freshNote = Note(fromFileURL: previousFileURL) {
+                        currentNote = freshNote
+                        selectedNoteItem = .note(freshNote)
+                    } else {
+                        // Fallback to hierarchy note if direct load fails
+                        currentNote = matchingNote
+                        selectedNoteItem = .note(matchingNote)
+                    }
+                } else {
+                    // Note was deleted or moved, clear selection
+                    currentNote = nil
+                    selectedNoteItem = nil
+                }
+            } else if let previousFileURL = previousSelectedItemFileURL {
+                // If we had a folder selected, try to restore it
+                if let matchingItem = findItem(by: previousFileURL, in: noteItems) {
+                    selectedNoteItem = matchingItem
+                    if case .note(let note) = matchingItem {
+                        currentNote = note
+                    } else {
+                        currentNote = nil
+                    }
+                } else {
+                    selectedNoteItem = nil
+                    currentNote = nil
+                }
+            }
+            
             isLoading = false
         } catch {
             errorMessage = "Failed to load notes: \(error.localizedDescription)"
             isLoading = false
         }
+    }
+    
+    /// Recursively finds a note by file URL in the note items hierarchy
+    private func findNote(by fileURL: URL, in items: [NoteItem]) -> Note? {
+        let targetPath = fileURL.standardized.path
+        for item in items {
+            switch item {
+            case .note(let note):
+                // Compare paths to handle URL representation differences
+                if note.fileURL.standardized.path == targetPath {
+                    return note
+                }
+            case .folder(let folder):
+                if let found = findNote(by: fileURL, in: folder.children) {
+                    return found
+                }
+            }
+        }
+        return nil
+    }
+    
+    /// Recursively finds an item by file URL in the note items hierarchy
+    private func findItem(by fileURL: URL, in items: [NoteItem]) -> NoteItem? {
+        let targetPath = fileURL.standardized.path
+        for item in items {
+            // Compare paths to handle URL representation differences
+            if item.fileURL.standardized.path == targetPath {
+                return item
+            }
+            if case .folder(let folder) = item {
+                if let found = findItem(by: fileURL, in: folder.children) {
+                    return found
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Selection
@@ -92,7 +167,11 @@ class NotesViewModel: @unchecked Sendable {
             var updatedNote = note
             updatedNote.touch()
             try await fileSystemService.saveNote(updatedNote)
-            currentNote = updatedNote
+            
+            // Small delay to ensure file system has flushed the write
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            // Reload notes to get fresh content from disk
             await loadNotes()
         } catch {
             errorMessage = "Failed to save note: \(error.localizedDescription)"
@@ -102,7 +181,8 @@ class NotesViewModel: @unchecked Sendable {
     func deleteNote(_ note: Note) async {
         do {
             try await fileSystemService.deleteNote(note)
-            if currentNote?.id == note.id {
+            // Compare by file URL since IDs may change after reload
+            if currentNote?.fileURL == note.fileURL {
                 currentNote = nil
                 selectedNoteItem = nil
             }
@@ -122,7 +202,8 @@ class NotesViewModel: @unchecked Sendable {
         do {
             let renamedNote = try await fileSystemService.renameNote(note, to: newTitle)
             // If we got a renamed note back, the rename succeeded - clear any previous error
-            if currentNote?.id == note.id {
+            // Compare by file URL since IDs may change after reload
+            if currentNote?.fileURL == note.fileURL {
                 currentNote = renamedNote
             }
             await loadNotes()
@@ -176,7 +257,8 @@ class NotesViewModel: @unchecked Sendable {
     func deleteFolder(_ folder: Folder) async {
         do {
             try fileSystemService.deleteFolder(folder)
-            if let selectedItem = selectedNoteItem, selectedItem.id == folder.id {
+            // Compare by file URL since IDs may change after reload
+            if let selectedItem = selectedNoteItem, selectedItem.fileURL == folder.fileURL {
                 currentNote = nil
                 selectedNoteItem = nil
             }
