@@ -18,6 +18,7 @@ struct Notable: App {
         WindowGroup(id: "main") {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {

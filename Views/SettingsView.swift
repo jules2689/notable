@@ -41,6 +41,8 @@ enum AppearanceMode: String, CaseIterable {
 
 struct SettingsView: View {
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
+    @AppStorage("showWordCount") private var showWordCount: Bool = true
+    @AppStorage("showReadTime") private var showReadTime: Bool = true
     @State private var storageType: StorageLocationType = StorageLocationManager.shared.storageType
     @State private var customPath: String = StorageLocationManager.shared.customPath ?? ""
     @State private var webdavServerURL: String = StorageLocationManager.shared.webdavServerURL?.absoluteString ?? ""
@@ -104,6 +106,11 @@ struct SettingsView: View {
                             appearanceMode = .system
                         }
                     }
+                }
+                
+                Section("Editor") {
+                    Toggle("Show Word Count", isOn: $showWordCount)
+                    Toggle("Show Estimated Read Time", isOn: $showReadTime)
                 }
                 
                 Section("Storage Location") {

@@ -4,16 +4,51 @@ import AppKit
 struct SidebarView: View {
     var viewModel: NotesViewModel
     @Binding var searchText: String
+    @Binding var editedContent: String
+    @Binding var isSaved: Bool
+    var onSave: () -> Void
     @State private var draggedItem: NoteItem?
+    @AppStorage("showWordCount") private var showWordCount: Bool = true
+    @AppStorage("showReadTime") private var showReadTime: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
-            // Search bar
-            SearchBar(text: $searchText, onSearch: { query in
-                Task {
-                    await viewModel.searchNotes(query: query)
+            // Header with search and add button
+            HStack(spacing: 8) {
+                SearchBar(text: $searchText, onSearch: { query in
+                    Task {
+                        await viewModel.searchNotes(query: query)
+                    }
+                })
+                
+                Menu {
+                    Button {
+                        Task {
+                            await viewModel.createNote(title: "Untitled")
+                        }
+                    } label: {
+                        Label("New Note", systemImage: "doc.badge.plus")
+                    }
+
+                    Button {
+                        Task {
+                            await viewModel.createFolder(name: "New Folder")
+                        }
+                    } label: {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                        .cornerRadius(6)
                 }
-            })
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
 
@@ -49,33 +84,111 @@ struct SidebarView: View {
                         }
                     }
                 }
-             }
-         }
-         .background(Color(nsColor: .textBackgroundColor))
-         .navigationTitle("")
-         .toolbar {
-             ToolbarItem(placement: .primaryAction) {
-                 Menu {
-                    Button {
-                        Task {
-                            await viewModel.createNote(title: "Untitled")
-                        }
-                    } label: {
-                        Label("New Note", systemImage: "doc.badge.plus")
-                    }
+            }
+            
+            // Sticky footer with save status, word count, and read time
+            if viewModel.currentNote != nil {
+                SidebarFooter(
+                    content: editedContent,
+                    isSaved: isSaved,
+                    showWordCount: showWordCount,
+                    showReadTime: showReadTime,
+                    onSave: onSave
+                )
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+}
 
-                    Button {
-                        Task {
-                            await viewModel.createFolder(name: "New Folder")
+// MARK: - Sidebar Footer
+
+struct SidebarFooter: View {
+    let content: String
+    let isSaved: Bool
+    let showWordCount: Bool
+    let showReadTime: Bool
+    let onSave: () -> Void
+    
+    private var wordCount: Int {
+        let words = content.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        return words.count
+    }
+    
+    private var estimatedReadTime: String {
+        // Average reading speed is about 200-250 words per minute
+        let wordsPerMinute = 200
+        let minutes = max(1, wordCount / wordsPerMinute)
+        if minutes == 1 {
+            return "1 min read"
+        } else {
+            return "\(minutes) min read"
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            
+            HStack(spacing: 12) {
+                // Save status button
+                Button {
+                    onSave()
+                } label: {
+                    HStack(spacing: 4) {
+                        if isSaved {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.green)
+                            Text("Saved")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 6))
+                                .foregroundStyle(.orange)
+                            Text("Unsaved")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        Label("New Folder", systemImage: "folder.badge.plus")
                     }
-                 } label: {
-                     Label("Add", systemImage: "plus")
-                 }
-             }
-         }
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaved)
+                
+                Spacer()
+                
+                // Word count and read time
+                HStack(spacing: 8) {
+                    if showWordCount {
+                        let pluralWords = wordCount != 1 ? "words" : "word"
+                        HStack(spacing: 2) {
+                            Image(systemName: "text.word.spacing")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                            Text("\(wordCount) \(pluralWords)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    if showReadTime {
+                        HStack(spacing: 2) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                            Text(estimatedReadTime)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(nsColor: .textBackgroundColor))
+        }
     }
 }
 
@@ -348,7 +461,10 @@ struct HierarchicalNoteItemRow: View {
 #Preview {
     SidebarView(
         viewModel: NotesViewModel(),
-        searchText: .constant("")
+        searchText: .constant(""),
+        editedContent: .constant("Sample content for preview"),
+        isSaved: .constant(true),
+        onSave: {}
     )
     .frame(width: 250)
 }

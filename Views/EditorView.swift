@@ -3,7 +3,9 @@ import Combine
 
 struct EditorView: View {
     var viewModel: NotesViewModel
-    @State private var editedContent: String = ""
+    @Binding var editedContent: String
+    @Binding var isSaved: Bool
+    var onSaveActionReady: ((@escaping () -> Void) -> Void)?
     @State private var autoSaveTask: Task<Void, Never>?
     @State private var lastSavedContent: String = ""
     @State private var renameTask: Task<Void, Never>?
@@ -28,9 +30,16 @@ struct EditorView: View {
                 .onAppear {
                     editedContent = note.content
                     lastSavedContent = note.content
+                    isSaved = true
                     isEditorFocused = true
                     // Ensure content is visible on first load (no animation needed)
                     contentOpacity = 1.0
+                    // Provide save action to parent
+                    onSaveActionReady? { [self] in
+                        Task {
+                            await saveNote()
+                        }
+                    }
                 }
                 .onChange(of: viewModel.currentNote) { oldNote, newNote in
                     // Watch for when the note object itself changes (e.g., after reload)
@@ -41,6 +50,7 @@ struct EditorView: View {
                         // Update content immediately to avoid race conditions with the editor
                         editedContent = newNote.content
                         lastSavedContent = newNote.content
+                        isSaved = true
                         
                         // Manage opacity for smooth transition only if it's a different note file
                         let isDifferentNote = oldNote?.fileURL != newNote.fileURL
@@ -59,8 +69,13 @@ struct EditorView: View {
                         // Note was deselected
                         editedContent = ""
                         lastSavedContent = ""
+                        isSaved = true
                         contentOpacity = 0
                     }
+                }
+                .onChange(of: editedContent) { _, _ in
+                    // Update save status when content changes
+                    isSaved = editedContent == lastSavedContent
                 }
             } else {
                 // Empty state
@@ -81,102 +96,8 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle(viewModel.currentNote?.title ?? "Notable")
-        .toolbarBackground(Color(nsColor: .textBackgroundColor), for: .windowToolbar)
-        .toolbar {
-            // Editable title on the left side of the title bar
-            ToolbarItem(placement: .navigation) {
-                if viewModel.currentNote != nil {
-                    TextField("Note Title", text: Binding(
-                        get: { 
-                            if pendingTitle.isEmpty {
-                                return viewModel.currentNote?.title ?? ""
-                            }
-                            return pendingTitle
-                        },
-                        set: { newTitle in
-                            pendingTitle = newTitle
-                            
-                            // Debounce rename to avoid multiple calls while typing
-                            renameTask?.cancel()
-                            renameTask = Task {
-                                // Wait 0.5 seconds after user stops typing
-                                try? await Task.sleep(for: .milliseconds(500))
-                                
-                                // Check if task was cancelled
-                                guard !Task.isCancelled else { return }
-                                
-                                // Get the current note at the time of execution (may have changed)
-                                await MainActor.run {
-                                    guard let note = viewModel.currentNote else { return }
-                                    
-                                    // Only rename if title actually changed and is not empty
-                                    let trimmedTitle = newTitle.trimmingCharacters(in: .whitespaces)
-                                    if !trimmedTitle.isEmpty && trimmedTitle != note.title {
-                                        Task {
-                                            await viewModel.renameNote(note, to: trimmedTitle)
-                                        }
-                                    }
-                                    pendingTitle = "" // Clear pending after rename attempt
-                                }
-                            }
-                        }
-                    ))
-                    .textFieldStyle(.plain)
-                    .font(.title2)
-                    .frame(maxWidth: 300)
-                    .onSubmit {
-                        // Rename immediately on submit (Enter key)
-                        renameTask?.cancel()
-                        if let note = viewModel.currentNote,
-                           !pendingTitle.trimmingCharacters(in: .whitespaces).isEmpty,
-                           pendingTitle != note.title {
-                            Task {
-                                await viewModel.renameNote(note, to: pendingTitle)
-                            }
-                            pendingTitle = "" // Clear pending after rename
-                        }
-                    }
-                    .onChange(of: viewModel.currentNote?.id) { _, _ in
-                        // Reset pending title when note changes
-                        pendingTitle = ""
-                    }
-                }
-            }
-
-            // Save status indicator on the right (clickable to save)
-            ToolbarItem(placement: .automatic) {
-                if viewModel.currentNote != nil {
-                    if editedContent != lastSavedContent {
-                        Button {
-                            Task {
-                                await saveNote()
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundStyle(.orange)
-                                Text("Unsaved")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .keyboardShortcut("s", modifiers: .command)
-                    } else if editedContent == lastSavedContent && !editedContent.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.green)
-                            Text("Saved")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.all, edges: .top)
     }
 
     // MARK: - Actions
@@ -207,12 +128,18 @@ struct EditorView: View {
         viewModel.currentNote = note
         await viewModel.saveCurrentNote()
 
-        // Update last saved content
+        // Update last saved content and status
         lastSavedContent = editedContent
+        isSaved = true
     }
 }
 
 #Preview {
-    EditorView(viewModel: NotesViewModel())
-        .frame(width: 600, height: 400)
+    EditorView(
+        viewModel: NotesViewModel(),
+        editedContent: .constant("Preview content"),
+        isSaved: .constant(true),
+        onSaveActionReady: nil
+    )
+    .frame(width: 600, height: 400)
 }

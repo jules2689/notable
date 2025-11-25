@@ -28,20 +28,36 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showingSettings = false
+    @State private var editedContent = ""
+    @State private var isSaved = true
+    @State private var saveAction: (() -> Void)?
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(viewModel: viewModel, searchText: $searchText)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 400)
-                .background(Color(nsColor: .textBackgroundColor))
+            SidebarView(
+                viewModel: viewModel,
+                searchText: $searchText,
+                editedContent: $editedContent,
+                isSaved: $isSaved,
+                onSave: { saveAction?() }
+            )
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 400)
+            .background(Color(nsColor: .textBackgroundColor))
         } detail: {
-            EditorView(viewModel: viewModel)
-                .navigationSplitViewColumnWidth(min: 400, ideal: 800)
-                .background(Color(nsColor: .textBackgroundColor))
+            EditorView(
+                viewModel: viewModel,
+                editedContent: $editedContent,
+                isSaved: $isSaved,
+                onSaveActionReady: { action in
+                    saveAction = action
+                }
+            )
+            .navigationSplitViewColumnWidth(min: 400, ideal: 800)
+            .background(Color(nsColor: .textBackgroundColor))
         }
         .navigationSplitViewStyle(.balanced)
-        .toolbarBackground(.hidden, for: .windowToolbar)
+        .toolbar(.hidden, for: .windowToolbar)
         .preferredColorScheme(appearanceMode.effectiveColorScheme())
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
