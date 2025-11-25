@@ -1,11 +1,36 @@
 import SwiftUI
 import AppKit
 
-// App delegate to configure window tabbing
+// App delegate to configure window tabbing and appearance
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Enable automatic window tabbing globally
         NSWindow.allowsAutomaticWindowTabbing = true
+        
+        // Configure all windows to have transparent title bar
+        for window in NSApp.windows {
+            configureWindow(window)
+        }
+        
+        // Observe new windows being created
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeMain(_:)),
+            name: NSWindow.didBecomeMainNotification,
+            object: nil
+        )
+    }
+    
+    @objc func windowDidBecomeMain(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            configureWindow(window)
+        }
+    }
+    
+    private func configureWindow(_ window: NSWindow) {
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
     }
 }
 
@@ -18,7 +43,6 @@ struct Notable: App {
         WindowGroup(id: "main") {
             ContentView()
         }
-        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {

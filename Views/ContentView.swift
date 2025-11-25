@@ -57,7 +57,6 @@ struct ContentView: View {
             .background(Color(nsColor: .textBackgroundColor))
         }
         .navigationSplitViewStyle(.balanced)
-        .toolbar(.hidden, for: .windowToolbar)
         .preferredColorScheme(appearanceMode.effectiveColorScheme())
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
