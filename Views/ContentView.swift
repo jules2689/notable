@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // Define a focused value key for the view model
 struct NotesViewModelKey: FocusedValueKey {
@@ -56,6 +57,28 @@ struct ContentView: View {
         }
         .focusedValue(\.notesViewModel, viewModel)
         .focusedValue(\.showingSettings, $showingSettings)
+        .background(WindowTabbingModifier())
+    }
+}
+
+// View modifier to enable window tabbing for all windows
+struct WindowTabbingModifier: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.tabbingMode = .preferred
+                window.tabbingIdentifier = "main"
+            }
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let window = nsView.window {
+            window.tabbingMode = .preferred
+            window.tabbingIdentifier = "main"
+        }
     }
 }
 

@@ -81,7 +81,7 @@ struct EditorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .navigationTitle("") // Gets rid of the default navigation title
+        .navigationTitle(viewModel.currentNote?.title ?? "Notable")
         .toolbarBackground(Color(nsColor: .textBackgroundColor), for: .windowToolbar)
         .toolbar {
             // Editable title on the left side of the title bar
