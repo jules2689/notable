@@ -27,6 +27,11 @@ class NotesViewModel: @unchecked Sendable {
                 await self?.handleStorageLocationChange()
             }
         }
+        
+        // Start loading notes immediately
+        Task {
+            await loadNotes()
+        }
     }
     
     deinit {

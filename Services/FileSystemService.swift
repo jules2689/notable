@@ -86,7 +86,12 @@ class FileSystemService: @unchecked Sendable {
         // Ensure security-scoped access is started
         _ = storageManager.startAccessingSecurityScopedResource()
         try await ensureNotesDirectoryExists()
-        return try loadItems(at: workspace.rootURL)
+        
+        let rootURL = workspace.rootURL
+        
+        return try await Task.detached(priority: .userInitiated) {
+            try await FileSystemService.loadItems(at: rootURL)
+        }.value
     }
     
     /// Loads items from WebDAV
@@ -177,7 +182,8 @@ class FileSystemService: @unchecked Sendable {
     }
 
     /// Recursively loads notes and folders from a directory
-    private func loadItems(at url: URL) throws -> [NoteItem] {
+    private static func loadItems(at url: URL) throws -> [NoteItem] {
+        let fileManager = FileManager.default
         let contents = try fileManager.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],

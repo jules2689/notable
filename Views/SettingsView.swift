@@ -53,9 +53,24 @@ struct SettingsView: View {
     @State private var isTestingConnection = false
     @State private var connectionTestResult: String?
     @State private var connectionTestColor: Color = .red
+    @State private var pathCopied = false
+    @State private var logsPathCopied = false
     @Environment(\.dismiss) private var dismiss
     
     private let storageManager = StorageLocationManager.shared
+    
+    /// Gets the logs directory path for the app
+    private var logsDirectoryPath: String {
+        let fileManager = FileManager.default
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.notable.Notable"
+        let homeURL = fileManager.homeDirectoryForCurrentUser
+        
+        // For sandboxed apps, logs are in ~/Library/Containers/[BundleID]/Data/Library/Logs/
+        // For non-sandboxed apps, logs are in ~/Library/Logs/[AppName]/
+        // Since the app is sandboxed (based on entitlements), use container path
+        let containerLogsURL = homeURL.appendingPathComponent("Library/Containers/\(bundleID)/Data/Library/Logs", isDirectory: true)
+        return containerLogsURL.path
+    }
     
     var body: some View {
         NavigationStack {
@@ -119,9 +134,23 @@ struct SettingsView: View {
                             }
                             
                             if !customPath.isEmpty {
-                                Text(storageManager.rootURL.path)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                HStack {
+                                    Text(storageManager.rootURL.path)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        copyPathToClipboard(storageManager.rootURL.path)
+                                    }) {
+                                        Image(systemName: pathCopied ? "checkmark.circle.fill" : "doc.on.doc")
+                                            .font(.caption)
+                                            .foregroundStyle(pathCopied ? .green : .secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Copy path to clipboard")
+                                }
                             }
                         } else if storageType == .webdav {
                             VStack(alignment: .leading, spacing: 8) {
@@ -164,10 +193,44 @@ struct SettingsView: View {
                                 }
                             }
                         } else {
-                            Text(storageManager.rootURL.path)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            HStack {
+                                Text(storageManager.rootURL.path)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    copyPathToClipboard(storageManager.rootURL.path)
+                                }) {
+                                    Image(systemName: pathCopied ? "checkmark.circle.fill" : "doc.on.doc")
+                                        .font(.caption)
+                                        .foregroundStyle(pathCopied ? .green : .secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Copy path to clipboard")
+                            }
                         }
+                    }
+                }
+                
+                Section("Logs Location") {
+                    HStack {
+                        Text(logsDirectoryPath)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            copyLogsPathToClipboard(logsDirectoryPath)
+                        }) {
+                            Image(systemName: logsPathCopied ? "checkmark.circle.fill" : "doc.on.doc")
+                                .font(.caption)
+                                .foregroundStyle(logsPathCopied ? .green : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy logs path to clipboard")
                     }
                 }
             }
@@ -295,6 +358,30 @@ struct SettingsView: View {
         connectionTestColor = .red
         // Clear password field after successful save
         webdavPassword = ""
+    }
+    
+    private func copyPathToClipboard(_ path: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(path, forType: .string)
+        
+        // Show feedback
+        pathCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            pathCopied = false
+        }
+    }
+    
+    private func copyLogsPathToClipboard(_ path: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(path, forType: .string)
+        
+        // Show feedback
+        logsPathCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            logsPathCopied = false
+        }
     }
 }
 
