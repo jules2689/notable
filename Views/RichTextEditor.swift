@@ -5,7 +5,11 @@ import AppKit
 /// A rich text editor using contenteditable HTML with markdown support
 struct RichTextEditor: NSViewRepresentable {
     @Binding var text: String
+    var noteID: UUID
     var onTextChange: (String) -> Void
+
+    // Cache for the HTML content to improve performance
+    private static var cachedHTMLString: String?
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -21,6 +25,9 @@ struct RichTextEditor: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        
+        // Make webview transparent to avoid white flash while loading
+        webView.setValue(false, forKey: "drawsBackground")
 
         // Enable Web Inspector for debugging
         #if DEBUG
@@ -29,14 +36,20 @@ struct RichTextEditor: NSViewRepresentable {
         }
         #endif
 
-        // Load the HTML file
-        if let htmlPath = Bundle.main.path(forResource: "RichEditor", ofType: "html"),
+        // Load the HTML file (using cache if available)
+        if let htmlString = Self.cachedHTMLString {
+            webView.loadHTMLString(htmlString, baseURL: Bundle.main.resourceURL)
+        } else if let htmlPath = Bundle.main.path(forResource: "RichEditor", ofType: "html"),
            let htmlString = try? String(contentsOfFile: htmlPath, encoding: .utf8) {
+            Self.cachedHTMLString = htmlString
             webView.loadHTMLString(htmlString, baseURL: Bundle.main.resourceURL)
         }
 
+        // When creating a new view, assume not ready until we get the signal
+        context.coordinator.isReady = false
         context.coordinator.webView = webView
         context.coordinator.initialText = text
+        context.coordinator.currentNoteID = noteID
 
         return webView
     }
@@ -50,46 +63,31 @@ struct RichTextEditor: NSViewRepresentable {
         }
 
         // Only update if text changed externally (e.g., switching notes)
-        if context.coordinator.shouldUpdateContent(newText: text) {
-            // Only set content if the editor is ready
-            guard context.coordinator.isReady else {
-                // Store the text to set once ready
-                context.coordinator.pendingText = text
-                // Also update initialText in case ready hasn't fired yet
-                if context.coordinator.initialText.isEmpty {
-                    context.coordinator.initialText = text
-                }
-                return
+        // OR if the note ID changed (forcing a reload of content even if text matches last received)
+        if context.coordinator.shouldUpdateContent(newText: text, newID: noteID) {
+            // If the note ID changed, we need to treat the editor as not ready until we set content
+            // This prevents race conditions where we might try to set content on a stale editor state
+            if context.coordinator.currentNoteID != noteID {
+                print("🔄 RichTextEditor: Note ID changed from \(String(describing: context.coordinator.currentNoteID)) to \(noteID)")
+                // If we're switching notes, we might want to ensure we wait for a clean state
+                // but for now, let's just update the ID and proceed
             }
             
-            print("🔄 RichTextEditor: Setting content (\(text.count) chars)")
-            if text.contains("|") {
-                print("📊 Loading note with table")
-                if let tableStart = text.range(of: "|") {
-                    let start = tableStart.lowerBound
-                    let end = text.index(start, offsetBy: min(200, text.distance(from: start, to: text.endIndex)))
-                    print("Table markdown: \(text[start..<end])")
-                }
-            }
+            // Store the text to set immediately
+            context.coordinator.pendingText = text
+            context.coordinator.currentNoteID = noteID
             context.coordinator.lastSetText = text
-
-            // Use JSON encoding for safe string escaping
-            guard let escapedText = context.coordinator.escapeForJavaScript(text) else {
-                print("❌ Error encoding text to JSON")
-                return
+            
+            // Also update initialText in case ready hasn't fired yet
+            if context.coordinator.initialText.isEmpty {
+                context.coordinator.initialText = text
             }
             
-            let jsCode = "window.setContent(\"\(escapedText)\");"
-
-            print("📤 Executing setContent with \(text.count) chars")
-
-            webView.evaluateJavaScript(jsCode) { result, error in
-                if let error = error {
-                    print("❌ Error setting content: \(error.localizedDescription)")
-                    print("❌error: \(error)")
-                } else {
-                    print("✅ Content set successfully")
-                }
+            // If editor is ready, apply immediately
+            if context.coordinator.isReady {
+                context.coordinator.applyPendingText()
+            } else {
+                print("⏳ RichTextEditor: Waiting for ready signal to set content")
             }
         }
     }
@@ -107,6 +105,42 @@ struct RichTextEditor: NSViewRepresentable {
         var lastSetText: String = ""
         var lastReceivedText: String = ""
         var pendingText: String? = nil
+        var currentNoteID: UUID?
+        
+        func applyPendingText() {
+            guard let textToSet = pendingText else { return }
+            guard let webView = webView else { return }
+            
+            print("🔄 RichTextEditor: Applying pending text (\(textToSet.count) chars)")
+            
+            // Use JSON encoding for safe string escaping
+            // Fallback to manual escaping if JSON fails (unlikely but safe)
+            var jsCode = ""
+            if let escapedText = escapeForJavaScript(textToSet) {
+                jsCode = "window.setContent(\"\(escapedText)\");"
+            } else {
+                print("⚠️ RichTextEditor: JSON encoding failed, using fallback escaping")
+                let manualEscaped = textToSet
+                    .replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                    .replacingOccurrences(of: "\n", with: "\\n")
+                    .replacingOccurrences(of: "\r", with: "\\r")
+                jsCode = "window.setContent(\"\(manualEscaped)\");"
+            }
+            
+            print("📤 Executing setContent with \(textToSet.count) chars")
+            
+            webView.evaluateJavaScript(jsCode) { result, error in
+                if let error = error {
+                    print("❌ Error setting content: \(error.localizedDescription)")
+                } else {
+                    print("✅ Content set successfully")
+                }
+            }
+            
+            // Clear pending text after applying
+            pendingText = nil
+        }
         
         // Store webview window data to keep them alive
         private final class WebViewWindowData: @unchecked Sendable {
@@ -234,28 +268,18 @@ struct RichTextEditor: NSViewRepresentable {
                 // This handles the case where the binding was updated after makeNSView but before ready fired
                 let currentText = _text.wrappedValue
                 let textToSet = pendingText ?? (currentText.isEmpty ? initialText : currentText)
-                pendingText = nil
+                
+                // Set pending text so applyPendingText() can use it
+                pendingText = textToSet
                 
                 // Set content once editor is ready
                 if !textToSet.isEmpty {
                     print("🔄 RichTextEditor: Setting initial content on ready (\(textToSet.count) chars)")
-                    // Use JSON encoding for safe string escaping
-                    if let escapedText = escapeForJavaScript(textToSet) {
-                        let jsCode = "window.setContent(\"\(escapedText)\");"
-                        webView?.evaluateJavaScript(jsCode) { result, error in
-                            if let error = error {
-                                print("❌ Error setting initial content: \(error.localizedDescription)")
-                            } else {
-                                print("✅ Initial content set successfully")
-                            }
-                        }
-                        lastSetText = textToSet
-                        // Update initialText if it was empty
-                        if initialText.isEmpty {
-                            initialText = textToSet
-                        }
-                    } else {
-                        print("❌ Error encoding initial text to JSON")
+                    applyPendingText()
+                    lastSetText = textToSet
+                    // Update initialText if it was empty
+                    if initialText.isEmpty {
+                        initialText = textToSet
                     }
                 } else {
                     print("⚠️ RichTextEditor: Ready but no content to set")
@@ -300,7 +324,11 @@ struct RichTextEditor: NSViewRepresentable {
             }
         }
 
-        func shouldUpdateContent(newText: String) -> Bool {
+        func shouldUpdateContent(newText: String, newID: UUID) -> Bool {
+            // Always update if the note ID changed
+            if newID != currentNoteID {
+                return true
+            }
             // Only update if the text is different from what we last received
             // This prevents infinite loops when typing
             return newText != lastReceivedText && newText != lastSetText

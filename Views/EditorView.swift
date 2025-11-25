@@ -9,6 +9,7 @@ struct EditorView: View {
     @State private var renameTask: Task<Void, Never>?
     @State private var pendingTitle: String = ""
     @FocusState private var isEditorFocused: Bool
+    @State private var contentOpacity: Double = 1.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,45 +17,49 @@ struct EditorView: View {
                 // Rich text editor with full rendering
                 RichTextEditor(
                     text: $editedContent,
+                    noteID: note.id,
                     onTextChange: { newText in
                         scheduleAutoSave()
                     }
                 )
-                .id("\(note.fileURL.path)-\(note.modifiedAt.timeIntervalSince1970)") // Force refresh when note changes
+                .id(note.id) // Force recreate editor when note changes
+                .opacity(contentOpacity)
                 .focused($isEditorFocused)
                 .onAppear {
                     editedContent = note.content
                     lastSavedContent = note.content
                     isEditorFocused = true
-                }
-                .onChange(of: viewModel.currentNote?.id) { _, _ in
-                    // Cancel any pending auto-save when switching notes
-                    autoSaveTask?.cancel()
-                    if let note = viewModel.currentNote {
-                        editedContent = note.content
-                        lastSavedContent = note.content
-                    }
-                }
-                .onChange(of: viewModel.currentNote?.fileURL) { _, _ in
-                    // Also watch for file URL changes (e.g., after reload with new ID)
-                    autoSaveTask?.cancel()
-                    if let note = viewModel.currentNote {
-                        editedContent = note.content
-                        lastSavedContent = note.content
-                    }
+                    // Ensure content is visible on first load (no animation needed)
+                    contentOpacity = 1.0
                 }
                 .onChange(of: viewModel.currentNote) { oldNote, newNote in
                     // Watch for when the note object itself changes (e.g., after reload)
                     if let newNote = newNote {
-                        // Always update when note changes (different instance or different content)
-                        // This ensures we get fresh content after reload
+                        // Always update when note changes
                         autoSaveTask?.cancel()
+                        
+                        // Update content immediately to avoid race conditions with the editor
                         editedContent = newNote.content
                         lastSavedContent = newNote.content
+                        
+                        // Manage opacity for smooth transition only if it's a different note file
+                        let isDifferentNote = oldNote?.fileURL != newNote.fileURL
+                        
+                        if isDifferentNote {
+                            // For different notes, we can do a quick fade
+                            contentOpacity = 0
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                contentOpacity = 1.0
+                            }
+                        } else {
+                            // For same note (reload), just ensure visible
+                            contentOpacity = 1.0
+                        }
                     } else if oldNote != nil {
                         // Note was deselected
                         editedContent = ""
                         lastSavedContent = ""
+                        contentOpacity = 0
                     }
                 }
             } else {

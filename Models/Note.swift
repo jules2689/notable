@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Represents a single note document stored as a markdown file
 struct Note: Identifiable, Codable, Hashable {
@@ -29,14 +30,30 @@ struct Note: Identifiable, Codable, Hashable {
     }
 
     /// Creates a Note from a file URL by reading its contents
-    init?(fromFileURL url: URL) {
+    init?(fromFileURL url: URL, id: UUID? = nil) {
         guard url.pathExtension == "md" else { return nil }
 
         do {
             let content = try String(contentsOf: url, encoding: .utf8)
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
 
-            self.id = UUID()
+            if let id = id {
+                self.id = id
+            } else {
+                // Generate stable ID from file path using MD5 hash
+                // This ensures that reloading the same file results in the same ID
+                let path = url.standardized.path
+                if let data = path.data(using: .utf8) {
+                    let hash = Insecure.MD5.hash(data: data)
+                    self.id = hash.withUnsafeBytes { ptr in
+                        let uuidT = ptr.load(as: uuid_t.self)
+                        return UUID(uuid: uuidT)
+                    }
+                } else {
+                    self.id = UUID()
+                }
+            }
+            
             self.fileURL = url
             self.title = url.deletingPathExtension().lastPathComponent
             self.content = content
