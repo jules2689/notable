@@ -57,6 +57,15 @@ enum NoteItem: Identifiable, Codable, Hashable, Transferable {
         return false
     }
     
+    var icon: String? {
+        switch self {
+        case .note(let note):
+            return note.icon
+        case .folder(let folder):
+            return folder.icon
+        }
+    }
+    
     /// Returns children if this is a folder, nil otherwise (for OutlineGroup compatibility)
     var children: [NoteItem]? {
         if case .folder(let folder) = self {

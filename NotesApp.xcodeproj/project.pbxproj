@@ -33,6 +33,7 @@
 		AA0033 /* IconPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0033 /* IconPickerView.swift */; };
 		AA0034 /* IconImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0034 /* IconImageView.swift */; };
 		AA0035 /* AnimatedIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0035 /* AnimatedIconView.swift */; };
+		AA0036 /* MetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0036 /* MetadataParser.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -65,6 +66,7 @@
 		BB0033 /* IconPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconPickerView.swift; sourceTree = "<group>"; };
 		BB0034 /* IconImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconImageView.swift; sourceTree = "<group>"; };
 		BB0035 /* AnimatedIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedIconView.swift; sourceTree = "<group>"; };
+		BB0036 /* MetadataParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +151,7 @@
 				BB0025 /* KeychainHelper.swift */,
 				BB0029 /* TooltipModifier.swift */,
 				BB0032 /* FrontmatterParser.swift */,
+				BB0036 /* MetadataParser.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 				AA0033 /* IconPickerView.swift in Sources */,
 				AA0034 /* IconImageView.swift in Sources */,
 				AA0035 /* AnimatedIconView.swift in Sources */,
+				AA0036 /* MetadataParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

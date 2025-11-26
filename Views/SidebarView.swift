@@ -17,7 +17,7 @@ struct SidebarView: View {
                 .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
 
             // Header with search and add button
-            HStack(spacing: 8) {
+            HStack(spacing: 2) {
                 SearchBar(text: $searchText, onSearch: { query in
                     Task {
                         await viewModel.searchNotes(query: query)
@@ -47,8 +47,8 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .quickTooltip("Create new note or folder")
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
 
             // Notes list
             if viewModel.isLoading {
@@ -404,7 +404,7 @@ struct HierarchicalNoteItemRow: View {
     @State private var showingDeleteAlert = false
     @State private var newName = ""
     @State private var isTargeted = false
-    @State private var iconPickerNote: Note?
+    @State private var iconPickerItem: NoteItem?
     
     private var isExpanded: Bool {
         if case .folder(let folder) = item {
@@ -423,7 +423,7 @@ struct HierarchicalNoteItemRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Main row
-            HStack(spacing: 4) {
+            HStack(spacing: 6) { // Increased spacing to prevent overlap
                 // Indentation for nested items
                 if level > 0 {
                     ForEach(0..<level, id: \.self) { _ in
@@ -444,46 +444,48 @@ struct HierarchicalNoteItemRow: View {
                             .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
-                    .quickTooltip(isExpanded ? "Collapse folder" : "Expand folder")
+                    .contentShape(Rectangle())
+                    .frame(width: 16, height: 16)
+                    .allowsHitTesting(true)
                 } else {
                     // Spacer for non-folder items to align with folders
                     Spacer()
                         .frame(width: 16)
                 }
                 
-                // Show icon for notes, folder icon for folders
-                if item.isFolder {
-                    Image(systemName: "folder.fill")
-                        .foregroundStyle(.blue)
-                        .font(.system(size: 14))
-                } else if case .note(let note) = item {
-                    // Make icon clickable to change it
-                    Button(action: {
-                        iconPickerNote = note
-                    }) {
-                        if let icon = note.icon, !icon.isEmpty {
-                            // Show custom icon or emoji
-                            if icon.contains(".") {
-                                // Custom icon - load from icons folder
-                                IconImageView(iconName: icon, noteFileURL: note.fileURL, size: 20)
-                            } else {
-                                // Emoji
-                                Text(icon)
-                                    .font(.system(size: 18))
-                            }
-                        } else {
-                            // Default note icon
-                            Image(systemName: "doc.text.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 16))
-                        }
-                    }
-                    .buttonStyle(.plain)
+                // Show icon for notes and folders (both clickable)
+                // Use a separate view with its own tap handling
+                IconButtonView(item: item, iconPickerItem: $iconPickerItem)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(true)
                     .quickTooltip("Change icon")
-                }
 
+                // Make text area tappable for notes only
+                // For folders, only the chevron button toggles expansion
                 Text(item.name)
                     .lineLimit(1)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Don't toggle if icon picker is open for this item
+                        if iconPickerItem?.id == item.id {
+                            return
+                        }
+                        
+                        // Only handle note selection here - folders use chevron button only
+                        if case .note(let note) = item {
+                            let isShiftHeld = NSEvent.modifierFlags.contains(.shift)
+                            print("📝 SidebarView: Selecting note \(note.title), shift=\(isShiftHeld)")
+                            viewModel.selectNote(note)
+                            
+                            // Shift-click opens in new tab, regular click updates current tab
+                            if isShiftHeld {
+                                NotificationCenter.default.post(name: .noteOpenInNewTab, object: note)
+                            } else {
+                                NotificationCenter.default.post(name: .noteSelectedFromSidebar, object: note)
+                            }
+                        }
+                    }
 
                 Spacer()
 
@@ -516,15 +518,15 @@ struct HierarchicalNoteItemRow: View {
                 return provider
             }
             .contextMenu {
-                if item.isNote, case .note(let note) = item {
-                    Button {
-                        iconPickerNote = note
-                    } label: {
-                        Label("Change Icon...", systemImage: "tag")
-                    }
-                    
-                    Divider()
-                    
+                Button {
+                    iconPickerItem = item
+                } label: {
+                    Label("Change Icon...", systemImage: "tag")
+                }
+                
+                Divider()
+                
+                if item.isNote {
                     Button {
                         newName = item.name
                         showingRenameAlert = true
@@ -605,24 +607,6 @@ struct HierarchicalNoteItemRow: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            switch item {
-            case .note(let note):
-                let isShiftHeld = NSEvent.modifierFlags.contains(.shift)
-                print("📝 SidebarView: Selecting note \(note.title), shift=\(isShiftHeld)")
-                viewModel.selectNote(note)
-                
-                // Shift-click opens in new tab, regular click updates current tab
-                if isShiftHeld {
-                    NotificationCenter.default.post(name: .noteOpenInNewTab, object: note)
-                } else {
-                    NotificationCenter.default.post(name: .noteSelectedFromSidebar, object: note)
-                }
-            case .folder(let folder):
-                // Toggle expansion when clicking on folder
-                viewModel.toggleFolderExpansion(folder)
-            }
-        }
         .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
             guard item.isFolder else {
                 return false
@@ -645,20 +629,49 @@ struct HierarchicalNoteItemRow: View {
             
             return false
         }
-        .sheet(item: $iconPickerNote) { note in
-            IconPickerView(
-                selectedIcon: Binding(
-                    get: { note.icon },
-                    set: { newIcon in
-                        updateNoteIcon(note: note, icon: newIcon)
+        .sheet(item: $iconPickerItem) { item in
+            if case .note(let note) = item {
+                IconPickerView(
+                    selectedIcon: Binding(
+                        get: { note.icon },
+                        set: { newIcon in
+                            updateNoteIcon(note: note, icon: newIcon)
+                        }
+                    ),
+                    noteFileURL: note.fileURL,
+                    onCustomIconSelected: { _ in
+                        // Icon file has been copied, updateNoteIcon will handle the rest
                     }
-                ),
-                noteFileURL: note.fileURL,
-                onCustomIconSelected: { _ in
-                    // Icon file has been copied, updateNoteIcon will handle the rest
-                }
-            )
+                )
+            } else if case .folder(let folder) = item {
+                IconPickerView(
+                    selectedIcon: Binding(
+                        get: { folder.icon },
+                        set: { newIcon in
+                            updateFolderIcon(folder: folder, icon: newIcon)
+                        }
+                    ),
+                    noteFileURL: folder.fileURL,
+                    onCustomIconSelected: { _ in
+                        // Icon file has been copied, updateFolderIcon will handle the rest
+                    }
+                )
+            }
         }
+    }
+    
+    private func updateFolderIcon(folder: Folder, icon: String?) {
+        Task {
+            do {
+                try await viewModel.fileSystemService.saveFolderIcon(folder, icon: icon)
+                // Update folder icon in place without reloading
+                updateFolderIconInHierarchy(folder: folder, icon: icon)
+            } catch {
+                print("Failed to update folder icon: \(error)")
+            }
+        }
+        
+        iconPickerItem = nil
     }
     
     private func updateNoteIcon(note: Note, icon: String?) {
@@ -669,11 +682,63 @@ struct HierarchicalNoteItemRow: View {
         // Save the note with updated icon
         Task {
             await viewModel.saveCurrentNote()
-            // Reload to refresh sidebar
-            await viewModel.loadNotes()
+            // Update note icon in place without reloading
+            updateNoteIconInHierarchy(note: note, icon: icon)
         }
         
-        iconPickerNote = nil
+        iconPickerItem = nil
+    }
+    
+    /// Updates folder icon in the hierarchy without reloading
+    private func updateFolderIconInHierarchy(folder: Folder, icon: String?) {
+        func updateInItems(_ items: inout [NoteItem]) {
+            for i in items.indices {
+                if case .folder(var f) = items[i], f.id == folder.id {
+                    f.icon = icon
+                    items[i] = .folder(f)
+                    return
+                } else if case .folder(var f) = items[i] {
+                    var children = f.children
+                    updateInItems(&children)
+                    f.children = children
+                    items[i] = .folder(f)
+                }
+            }
+        }
+        
+        var allItems = viewModel.allNoteItems
+        updateInItems(&allItems)
+        viewModel.allNoteItems = allItems
+        
+        var displayItems = viewModel.noteItems
+        updateInItems(&displayItems)
+        viewModel.noteItems = displayItems
+    }
+    
+    /// Updates note icon in the hierarchy without reloading
+    private func updateNoteIconInHierarchy(note: Note, icon: String?) {
+        func updateInItems(_ items: inout [NoteItem]) {
+            for i in items.indices {
+                if case .note(var n) = items[i], n.id == note.id {
+                    n.icon = icon
+                    items[i] = .note(n)
+                    return
+                } else if case .folder(var f) = items[i] {
+                    var children = f.children
+                    updateInItems(&children)
+                    f.children = children
+                    items[i] = .folder(f)
+                }
+            }
+        }
+        
+        var allItems = viewModel.allNoteItems
+        updateInItems(&allItems)
+        viewModel.allNoteItems = allItems
+        
+        var displayItems = viewModel.noteItems
+        updateInItems(&displayItems)
+        viewModel.noteItems = displayItems
     }
     
     /// Checks if an item is a descendant of another item (to prevent circular moves)
@@ -693,6 +758,81 @@ struct HierarchicalNoteItemRow: View {
         }
         
         return false
+    }
+}
+
+// MARK: - Icon Button View
+// Separate view to isolate tap handling and prevent propagation
+struct IconButtonView: View {
+    let item: NoteItem
+    @Binding var iconPickerItem: NoteItem?
+    
+    var body: some View {
+        Button(action: {
+            // Set immediately to prevent any other gestures from firing
+            iconPickerItem = item
+        }) {
+            if let icon = item.icon, !icon.isEmpty {
+                // Show custom icon or emoji
+                if icon.contains(".") {
+                    // Custom icon - load from .icons folder (for notes) or folder's .icons folder (for folders)
+                    if item.isFolder, case .folder(let folder) = item {
+                        IconImageView(iconName: icon, noteFileURL: folder.fileURL, size: 20)
+                    } else if case .note(let note) = item {
+                        IconImageView(iconName: icon, noteFileURL: note.fileURL, size: 20)
+                    } else {
+                        Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
+                            .foregroundStyle(item.isFolder ? .blue : .secondary)
+                            .font(.system(size: item.isFolder ? 14 : 16))
+                    }
+                } else {
+                    // Emoji
+                    Text(icon)
+                        .font(.system(size: 18))
+                }
+            } else {
+                // Default icons
+                Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
+                    .foregroundStyle(item.isFolder ? .blue : .secondary)
+                    .font(.system(size: item.isFolder ? 14 : 16))
+            }
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .allowsHitTesting(true)
+        .background(
+            // Invisible view that captures all mouse events to prevent propagation
+            TapBlockingView()
+                .frame(width: 24, height: 24)
+        )
+    }
+}
+
+// MARK: - Tap Blocking View
+// Custom NSView that blocks all mouse events from propagating
+struct TapBlockingView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = BlockingNSView()
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // No updates needed
+    }
+    
+    class BlockingNSView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            // Consume the mouse event - don't call super
+            // This prevents the event from propagating to parent views
+        }
+        
+        override func mouseUp(with event: NSEvent) {
+            // Consume the mouse event - don't call super
+        }
+        
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+            return true
+        }
     }
 }
 

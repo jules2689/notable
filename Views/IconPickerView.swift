@@ -387,7 +387,7 @@ struct IconPickerView: View {
     }
     
     private func handleCustomIconSelection(url: URL) {
-        // Copy the icon file to the icons folder
+        // Copy the icon file to the .icons folder
         guard let noteFileURL = noteFileURL else {
             // Fallback: just use filename
             selectedIcon = url.lastPathComponent
@@ -404,20 +404,20 @@ struct IconPickerView: View {
         }
         
         let noteDirectory = noteFileURL.deletingLastPathComponent()
-        let iconsFolder = noteDirectory.appendingPathComponent("icons", isDirectory: true)
+        let iconsFolder = noteDirectory.appendingPathComponent(".icons", isDirectory: true)
         let fileManager = FileManager.default
         
-        // Create icons folder if it doesn't exist
+        // Create .icons folder if it doesn't exist
         do {
             if !fileManager.fileExists(atPath: iconsFolder.path) {
                 try fileManager.createDirectory(at: iconsFolder, withIntermediateDirectories: true)
-                print("✅ Created icons folder at: \(iconsFolder.path)")
+                print("✅ Created .icons folder at: \(iconsFolder.path)")
             }
         } catch {
-            print("❌ Failed to create icons folder: \(error)")
+            print("❌ Failed to create .icons folder: \(error)")
         }
         
-        // Copy the file to icons folder
+        // Copy the file to .icons folder
         let destinationURL = iconsFolder.appendingPathComponent(url.lastPathComponent)
         
         do {

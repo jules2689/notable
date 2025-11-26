@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// View that displays a custom icon from the icons folder (supports animated GIFs)
+/// View that displays a custom icon from the .icons folder (supports animated GIFs)
 struct IconImageView: View {
     let iconName: String
     let noteFileURL: URL?
@@ -63,9 +63,9 @@ struct IconImageView: View {
             return
         }
         
-        // Get the icons folder path (same directory as the note)
+        // Get the .icons folder path (same directory as the note)
         let noteDirectory = noteFileURL.deletingLastPathComponent()
-        let iconsFolder = noteDirectory.appendingPathComponent("icons", isDirectory: true)
+        let iconsFolder = noteDirectory.appendingPathComponent(".icons", isDirectory: true)
         let url = iconsFolder.appendingPathComponent(iconName)
         
         // Check if file exists

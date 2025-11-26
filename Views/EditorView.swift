@@ -169,7 +169,7 @@ struct EditorView: View {
                     if let icon = tab.icon, !icon.isEmpty {
                         // Check if it's a custom icon (has file extension) or emoji
                         if icon.contains(".") {
-                            // Custom icon - load from icons folder
+                            // Custom icon - load from .icons folder
                             IconImageView(iconName: icon, noteFileURL: tab.fileURL, size: 20)
                         } else {
                             // Emoji

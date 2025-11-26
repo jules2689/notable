@@ -8,6 +8,7 @@ struct Folder: Identifiable, Codable, Hashable {
     var children: [NoteItem]
     var createdAt: Date
     var modifiedAt: Date
+    var icon: String? // Emoji string or custom icon filename
 
     init(
         id: UUID = UUID(),
@@ -15,7 +16,8 @@ struct Folder: Identifiable, Codable, Hashable {
         fileURL: URL,
         children: [NoteItem] = [],
         createdAt: Date = Date(),
-        modifiedAt: Date = Date()
+        modifiedAt: Date = Date(),
+        icon: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -23,6 +25,7 @@ struct Folder: Identifiable, Codable, Hashable {
         self.children = children
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
+        self.icon = icon
     }
 
     /// Creates a Folder from a directory URL
@@ -42,6 +45,14 @@ struct Folder: Identifiable, Codable, Hashable {
             self.children = []
             self.createdAt = attributes[.creationDate] as? Date ?? Date()
             self.modifiedAt = attributes[.modificationDate] as? Date ?? Date()
+            
+            // Load icon from .metadata file
+            let metadataURL = url.appendingPathComponent(".metadata")
+            if let metadata = MetadataParser.parse(from: metadataURL) {
+                self.icon = metadata["icon"]?.isEmpty == false ? metadata["icon"] : nil
+            } else {
+                self.icon = nil
+            }
         } catch {
             return nil
         }

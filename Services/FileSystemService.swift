@@ -197,8 +197,17 @@ class FileSystemService: @unchecked Sendable {
         var items: [NoteItem] = []
 
         for itemURL in contents {
-            // Skip hidden files and system files
-            if itemURL.lastPathComponent.hasPrefix(".") {
+            // Skip hidden files, system files, metadata files, and .icons folder
+            let fileName = itemURL.lastPathComponent
+            if fileName.hasPrefix(".") && fileName != ".metadata" {
+                continue
+            }
+            // Skip .metadata file itself (it's not a note or folder)
+            if fileName == ".metadata" {
+                continue
+            }
+            // Skip .icons folder (it's for storing custom icons)
+            if fileName == ".icons" {
                 continue
             }
 
@@ -585,6 +594,36 @@ class FileSystemService: @unchecked Sendable {
         }
 
         return renamedFolder
+    }
+    
+    /// Saves folder icon to .metadata file
+    func saveFolderIcon(_ folder: Folder, icon: String?) async throws {
+        ensureSecurityScopedAccess()
+        let metadataURL = folder.fileURL.appendingPathComponent(".metadata")
+        
+        var metadata: [String: String] = [:]
+        
+        // Read existing metadata if it exists
+        if let existing = MetadataParser.parse(from: metadataURL) {
+            metadata = existing
+        }
+        
+        // Update icon
+        if let icon = icon, !icon.isEmpty {
+            metadata["icon"] = icon
+        } else {
+            metadata.removeValue(forKey: "icon")
+        }
+        
+        // Write metadata file
+        if metadata.isEmpty {
+            // Remove metadata file if empty
+            if fileManager.fileExists(atPath: metadataURL.path) {
+                try fileManager.removeItem(at: metadataURL)
+            }
+        } else {
+            try MetadataParser.write(metadata, to: metadataURL)
+        }
     }
 
     // MARK: - Move Operations
