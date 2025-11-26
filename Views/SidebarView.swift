@@ -135,36 +135,91 @@ struct SidebarFooter: View {
         VStack(spacing: 0) {
             Divider()
             
-            HStack(spacing: 12) {
-                // Save status button
-                Button {
-                    onSave()
-                } label: {
-                    HStack(spacing: 4) {
-                        if isSaved {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.green)
-                            Text("Saved")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Image(systemName: "circle.fill")
-                                .font(.system(size: 6))
-                                .foregroundStyle(.orange)
-                            Text("Unsaved")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+            ViewThatFits {
+                // Try horizontal layout first (save status on left, word count/read time on right)
+                HStack(spacing: 12) {
+                    // Save status button
+                    Button {
+                        onSave()
+                    } label: {
+                        HStack(spacing: 4) {
+                            if isSaved {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.green)
+                                Text("Saved")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundStyle(.orange)
+                                Text("Unsaved")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaved)
+                    
+                    Spacer()
+                    
+                    // Word count and read time
+                    HStack(spacing: 8) {
+                        if showWordCount {
+                            let pluralWords = wordCount != 1 ? "words" : "word"
+                            HStack(spacing: 2) {
+                                Image(systemName: "text.word.spacing")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                                Text("\(wordCount) \(pluralWords)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if showReadTime {
+                            HStack(spacing: 2) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                                Text(estimatedReadTime)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
-                .buttonStyle(.plain)
-                .disabled(isSaved)
                 
-                Spacer()
-                
-                // Word count and read time
-                HStack(spacing: 8) {
+                // Fall back to vertical layout if horizontal doesn't fit
+                VStack(alignment: .leading, spacing: 4) {
+                    // Save status button
+                    Button {
+                        onSave()
+                    } label: {
+                        HStack(spacing: 4) {
+                            if isSaved {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.green)
+                                Text("Saved")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundStyle(.orange)
+                                Text("Unsaved")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaved)
+                    
+                    // Word count and read time
                     if showWordCount {
                         let pluralWords = wordCount != 1 ? "words" : "word"
                         HStack(spacing: 2) {
