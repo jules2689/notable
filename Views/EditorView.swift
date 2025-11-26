@@ -40,7 +40,7 @@ struct EditorView: View {
     @State private var editingTabID: UUID?
     @State private var editingTabTitle: String = ""
     @FocusState private var isTabTitleFocused: Bool
-    @State private var draggedTab: TabItem?
+    @State private var draggedTabID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -156,34 +156,16 @@ struct EditorView: View {
         .onHover { isHovered in
             hoveredTabID = isHovered ? tab.id : nil
         }
-        .opacity(draggedTab?.id == tab.id ? 0.5 : 1.0)
-        .draggable(tab.id.uuidString) {
-            // Drag preview
-            HStack(spacing: 4) {
-                Text(tab.title)
-                    .font(.system(size: 12))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(6)
-            .onAppear {
-                draggedTab = tab
-            }
+        .opacity(draggedTabID == tab.id ? 0.5 : 1.0)
+        .onDrag {
+            draggedTabID = tab.id
+            return NSItemProvider(object: tab.id.uuidString as NSString)
         }
-        .dropDestination(for: String.self) { items, location in
-            guard let draggedTab = draggedTab,
-                  draggedTab.id != tab.id,
-                  let fromIndex = openTabs.firstIndex(where: { $0.id == draggedTab.id }),
-                  let toIndex = openTabs.firstIndex(where: { $0.id == tab.id }) else {
-                return false
-            }
-            withAnimation(.easeInOut(duration: 0.2)) {
-                openTabs.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
-            }
-            self.draggedTab = nil
-            return true
-        }
+        .onDrop(of: [.text], delegate: TabDropDelegate(
+            tab: tab,
+            draggedTabID: $draggedTabID,
+            tabs: $openTabs
+        ))
         .contextMenu {
             if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
                 if index > 0 {
@@ -355,6 +337,41 @@ struct EditorView: View {
         
         lastSavedContent = editedContent
         isSaved = true
+    }
+}
+
+// MARK: - Tab Drop Delegate
+
+struct TabDropDelegate: DropDelegate {
+    let tab: TabItem
+    @Binding var draggedTabID: UUID?
+    @Binding var tabs: [TabItem]
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggedID = draggedTabID,
+              draggedID != tab.id,
+              let fromIndex = tabs.firstIndex(where: { $0.id == draggedID }),
+              let toIndex = tabs.firstIndex(where: { $0.id == tab.id }),
+              fromIndex != toIndex else {
+            return
+        }
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            tabs.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        draggedTabID = nil
+        return true
+    }
+    
+    func dropExited(info: DropInfo) {
+        // Don't clear draggedTabID here - it's still being dragged
     }
 }
 
