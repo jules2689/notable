@@ -40,11 +40,14 @@ class TooltipNSView: NSView {
     var tooltipTimer: Timer?
     var trackingArea: NSTrackingArea?
     var tooltipWindow: NSWindow?
+    var clickMonitor: Any?
     
     init(text: String, delay: TimeInterval) {
         self.tooltipText = text
         self.delay = delay
         super.init(frame: .zero)
+        // Ensure the view can receive mouse events
+        self.wantsLayer = false
     }
     
     required init?(coder: NSCoder) {
@@ -54,6 +57,34 @@ class TooltipNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         updateTrackingAreas()
+        
+        // Set up click monitor to hide tooltip when clicking anywhere
+        if window != nil {
+            setupClickMonitor()
+        } else {
+            removeClickMonitor()
+        }
+    }
+    
+    private func setupClickMonitor() {
+        removeClickMonitor()
+        
+        // Monitor for mouse down events to hide tooltip
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return event }
+            // Hide tooltip if it's showing
+            if self.tooltipWindow != nil {
+                self.hideTooltip()
+            }
+            return event
+        }
+    }
+    
+    private func removeClickMonitor() {
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
     }
     
     override func updateTrackingAreas() {
@@ -105,6 +136,7 @@ class TooltipNSView: NSView {
         tooltipTimer = nil
         hideTooltip()
     }
+    
     
     private func showTooltip() {
         guard let window = self.window else { return }
@@ -239,6 +271,9 @@ class TooltipNSView: NSView {
             MainActor.assumeIsolated {
                 // Invalidate timer
                 self.tooltipTimer?.invalidate()
+                
+                // Remove click monitor
+                self.removeClickMonitor()
                 
                 // Cleanup tracking area and window
                 if let area = self.trackingArea {
