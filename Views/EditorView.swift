@@ -53,7 +53,7 @@ struct EditorView: View {
         .background(Color(nsColor: .textBackgroundColor))
         .onChange(of: columnVisibility) { _, newValue in
             // Sync tab bar padding when sidebar is dragged closed/open (not just toggled)
-            withAnimation(.smooth(duration: 0.25)) {
+            withAnimation(.smooth(duration: 0.5)) {
                 tabBarLeadingPadding = newValue == .detailOnly ? 70 : 0
             }
         }
@@ -334,7 +334,14 @@ struct EditorView: View {
                     isSaved = editedContent == lastSavedContent
                 }
             } else {
-                emptyState
+                // Check if current tab is a missing file
+                if let selectedID = selectedTabID,
+                   let selectedTab = openTabs.first(where: { $0.id == selectedID }),
+                   selectedTab.isFileMissing {
+                    missingFileState(filename: selectedTab.title)
+                } else {
+                    emptyState
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -353,6 +360,20 @@ struct EditorView: View {
             Text("Select a note from the sidebar or create a new one")
                 .font(.body)
                 .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private func missingFileState(filename: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 64))
+                .foregroundStyle(.orange)
+            
+            Text(filename)
+                .font(.title2)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -76,7 +76,9 @@ struct ContentView: View {
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
     
     // Tab management
+    @AppStorage("openTabs") private var openTabsData: Data = Data()
     @State private var openTabs: [TabItem] = []
+    @AppStorage("selectedTabID") private var selectedTabIDString: String = ""
     @State private var selectedTabID: UUID?
     @State private var isSelectingTab = false  // Prevent onChange from updating tabs during tab switch
 
@@ -174,6 +176,55 @@ struct ContentView: View {
                 updateCurrentTabWithNote(note)
             }
         }
+        .onChange(of: openTabs) { _, _ in
+            // Persist tabs whenever they change
+            persistTabs()
+        }
+        .onChange(of: selectedTabID) { _, newID in
+            // Persist selected tab ID
+            selectedTabIDString = newID?.uuidString ?? ""
+        }
+        .onAppear {
+            // Restore tabs on app launch after notes are loaded
+            Task {
+                // Wait for notes to load
+                while viewModel.isLoading {
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                }
+                await MainActor.run {
+                    restoreTabs()
+                }
+            }
+        }
+        .onChange(of: viewModel.noteItems) { _, newItems in
+            // When notes finish loading, verify and update restored tabs
+            if !openTabs.isEmpty {
+                // Re-verify tabs against newly loaded notes
+                var updatedTabs = openTabs
+                for (index, tab) in updatedTabs.enumerated() {
+                    if tab.isFileMissing, let fileURL = tab.fileURL {
+                        // Check if the missing file now exists
+                        if findNote(by: fileURL) != nil {
+                            // File was found, update tab to normal state
+                            if let note = findNote(by: fileURL) {
+                                updatedTabs[index] = TabItem.forNote(note)
+                            }
+                        }
+                    } else if !tab.isEmpty, let fileURL = tab.fileURL {
+                        // Verify existing tabs still have valid files
+                        if findNote(by: fileURL) == nil {
+                            // File no longer exists, mark as missing
+                            let filename = fileURL.lastPathComponent
+                            updatedTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+                        }
+                    }
+                }
+                openTabs = updatedTabs
+            } else if !openTabsData.isEmpty {
+                // Tabs haven't been restored yet, restore them now
+                restoreTabs()
+            }
+        }
     }
     
     // MARK: - Tab Management
@@ -234,7 +285,8 @@ struct ContentView: View {
                 id: currentTabID,
                 noteID: note.id,
                 title: note.title,
-                fileURL: note.fileURL
+                fileURL: note.fileURL,
+                isFileMissing: false // Clear missing file flag if note was found
             )
         } else {
             print("📝 No current tab, creating new for \(note.title)")
@@ -248,12 +300,26 @@ struct ContentView: View {
         isSelectingTab = true  // Prevent onChange from updating this tab
         selectedTabID = tab.id
         
-        if tab.isEmpty {
+        if tab.isFileMissing {
+            // Missing file tab - show empty state with message
+            viewModel.currentNote = nil
+            viewModel.selectedNoteItem = nil
+        } else if tab.isEmpty {
+            // Empty tab
             viewModel.currentNote = nil
             viewModel.selectedNoteItem = nil
         } else if let fileURL = tab.fileURL, let note = findNote(by: fileURL) {
+            // Valid note file
             print("📝 selectTab: Loading note \(note.title) for tab")
             viewModel.selectNote(note)
+        } else if let fileURL = tab.fileURL {
+            // File URL exists but note not found - mark as missing
+            let filename = fileURL.lastPathComponent
+            if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
+                openTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+            }
+            viewModel.currentNote = nil
+            viewModel.selectedNoteItem = nil
         }
         
         // Reset flag after a short delay to ensure onChange has processed
@@ -296,6 +362,85 @@ struct ContentView: View {
             return nil
         }
         return searchItems(viewModel.noteItems)
+    }
+    
+    // MARK: - Tab Persistence
+    
+    private func persistTabs() {
+        // Encode tabs to JSON and store in AppStorage
+        if let encoded = try? JSONEncoder().encode(openTabs) {
+            openTabsData = encoded
+        }
+    }
+    
+    private func restoreTabs() {
+        // Decode tabs from AppStorage
+        guard !openTabsData.isEmpty,
+              let decoded = try? JSONDecoder().decode([TabItem].self, from: openTabsData) else {
+            // No persisted tabs, start fresh
+            return
+        }
+        
+        // Verify each tab's file exists and update state accordingly
+        var restoredTabs: [TabItem] = []
+        for tab in decoded {
+            if tab.isFileMissing {
+                // Keep missing file tabs as-is
+                restoredTabs.append(tab)
+            } else if let fileURL = tab.fileURL {
+                // Check if file exists on disk
+                let fileManager = FileManager.default
+                let fileExists = fileManager.fileExists(atPath: fileURL.path)
+                
+                // Also check if note exists in the loaded note hierarchy
+                let noteExistsInHierarchy = findNote(by: fileURL) != nil
+                
+                if fileExists && noteExistsInHierarchy {
+                    // File exists and is in hierarchy, restore tab normally
+                    restoredTabs.append(tab)
+                } else {
+                    // File doesn't exist or not in hierarchy, mark as missing
+                    let filename = fileURL.lastPathComponent
+                    let missingTab = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+                    restoredTabs.append(missingTab)
+                }
+            } else {
+                // Empty tab, restore as-is
+                restoredTabs.append(tab)
+            }
+        }
+        
+        openTabs = restoredTabs
+        
+        // Restore selected tab ID
+        if !selectedTabIDString.isEmpty, let uuid = UUID(uuidString: selectedTabIDString) {
+            // Verify the selected tab still exists
+            if restoredTabs.contains(where: { $0.id == uuid }) {
+                selectedTabID = uuid
+            } else if !restoredTabs.isEmpty {
+                // Selected tab no longer exists, select first tab
+                selectedTabID = restoredTabs.first?.id
+            }
+        } else if !restoredTabs.isEmpty {
+            // No selected tab, select first tab
+            selectedTabID = restoredTabs.first?.id
+        }
+        
+        // Load the selected tab's content if it has a valid file
+        if let selectedID = selectedTabID,
+           let selectedTab = restoredTabs.first(where: { $0.id == selectedID }),
+           !selectedTab.isEmpty,
+           !selectedTab.isFileMissing,
+           let fileURL = selectedTab.fileURL,
+           let note = findNote(by: fileURL) {
+            viewModel.selectNote(note)
+        } else if let selectedID = selectedTabID,
+                  let selectedTab = restoredTabs.first(where: { $0.id == selectedID }),
+                  selectedTab.isFileMissing {
+            // Tab is missing file, clear current note
+            viewModel.currentNote = nil
+            viewModel.selectedNoteItem = nil
+        }
     }
 }
 
