@@ -99,6 +99,7 @@ struct EditorView: View {
             }
             .layoutPriority(2)
             .buttonStyle(.plain)
+            .quickTooltip("Create new tab")
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .padding(.leading, 8 + tabBarLeadingPadding) // 8px base + dynamic padding for traffic lights
@@ -128,6 +129,7 @@ struct EditorView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .quickTooltip("Toggle sidebar")
     }
     
     private func tabItem(_ tab: TabItem) -> some View {
@@ -177,6 +179,7 @@ struct EditorView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .quickTooltip("Close tab")
             } else if !isEditing {
                 Color.clear.frame(width: 16, height: 16)
             }
@@ -296,7 +299,8 @@ struct EditorView: View {
             }
             return nil
         }
-        return searchItems(viewModel.noteItems)
+        // Search in allNoteItems (complete hierarchy) instead of noteItems (filtered for sidebar)
+        return searchItems(viewModel.allNoteItems)
     }
     
     // MARK: - Editor Content

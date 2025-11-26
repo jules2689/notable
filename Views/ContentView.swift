@@ -47,6 +47,16 @@ struct SaveActionKey: FocusedValueKey {
     typealias Value = () -> Void
 }
 
+// Define focused value key for showing help
+struct ShowingHelpKey: FocusedValueKey {
+    typealias Value = Binding<Bool>
+}
+
+// Define focused value key for showing keyboard shortcuts
+struct ShowingKeyboardShortcutsKey: FocusedValueKey {
+    typealias Value = Binding<Bool>
+}
+
 extension FocusedValues {
     var notesViewModel: NotesViewModel? {
         get { self[NotesViewModelKey.self] }
@@ -62,6 +72,16 @@ extension FocusedValues {
         get { self[SaveActionKey.self] }
         set { self[SaveActionKey.self] = newValue }
     }
+    
+    var showingHelp: Binding<Bool>? {
+        get { self[ShowingHelpKey.self] }
+        set { self[ShowingHelpKey.self] = newValue }
+    }
+    
+    var showingKeyboardShortcuts: Binding<Bool>? {
+        get { self[ShowingKeyboardShortcutsKey.self] }
+        set { self[ShowingKeyboardShortcutsKey.self] = newValue }
+    }
 }
 
 struct ContentView: View {
@@ -74,6 +94,8 @@ struct ContentView: View {
     @State private var isSaved = true
     @State private var saveAction: (() -> Void)?
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
+    @State private var showingHelp = false
+    @State private var showingKeyboardShortcuts = false
     
     // Tab management
     @AppStorage("openTabs") private var openTabsData: Data = Data()
@@ -140,9 +162,17 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
+        .sheet(isPresented: $showingHelp) {
+            HelpNoteView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingKeyboardShortcuts) {
+            KeyboardShortcutsView()
+        }
         .focusedValue(\.notesViewModel, viewModel)
         .focusedValue(\.showingSettings, $showingSettings)
         .focusedValue(\.saveAction, saveAction)
+        .focusedValue(\.showingHelp, $showingHelp)
+        .focusedValue(\.showingKeyboardShortcuts, $showingKeyboardShortcuts)
         .onReceive(NotificationCenter.default.publisher(for: .closeCurrentTab)) { _ in
             closeCurrentTab()
         }
@@ -153,7 +183,13 @@ struct ContentView: View {
             print("📝 Received noteSelectedFromSidebar notification")
             if let note = notification.object as? Note {
                 print("📝 Note found: \(note.title)")
-                updateCurrentTabWithNote(note)
+                // Save current note before switching
+                Task {
+                    await saveCurrentNoteIfNeeded()
+                    await MainActor.run {
+                        updateCurrentTabWithNote(note)
+                    }
+                }
             } else {
                 print("📝 Failed to cast notification.object to Note")
             }
@@ -249,6 +285,23 @@ struct ContentView: View {
         viewModel.selectedNoteItem = nil
     }
     
+    /// Saves the current note if there are unsaved changes
+    private func saveCurrentNoteIfNeeded() async {
+        guard !isSaved, var note = viewModel.currentNote else { return }
+        
+        // Update note content with edited content
+        note.content = editedContent
+        viewModel.currentNote = note
+        
+        // Save the note
+        await viewModel.saveCurrentNote()
+        
+        // Update saved state
+        await MainActor.run {
+            isSaved = true
+        }
+    }
+    
     private func openNoteInNewTab(_ note: Note) {
         isSelectingTab = true  // Prevent onChange from interfering
         let newTab = TabItem.forNote(note)
@@ -281,6 +334,7 @@ struct ContentView: View {
             let newTab = TabItem.forNote(note)
             openTabs.append(newTab)
             selectedTabID = newTab.id
+            viewModel.selectNote(note)
             return
         }
         
@@ -294,60 +348,76 @@ struct ContentView: View {
                 fileURL: note.fileURL,
                 isFileMissing: false // Clear missing file flag if note was found
             )
+            viewModel.selectNote(note)
         } else {
             print("📝 No current tab, creating new for \(note.title)")
             let newTab = TabItem.forNote(note)
             openTabs.append(newTab)
             selectedTabID = newTab.id
+            viewModel.selectNote(note)
         }
     }
     
     private func selectTab(_ tab: TabItem) {
-        isSelectingTab = true  // Prevent onChange from updating this tab
-        selectedTabID = tab.id
-        
-        if tab.isFileMissing {
-            // Missing file tab - show empty state with message
-            viewModel.currentNote = nil
-            viewModel.selectedNoteItem = nil
-        } else if tab.isEmpty {
-            // Empty tab
-            viewModel.currentNote = nil
-            viewModel.selectedNoteItem = nil
-        } else if let fileURL = tab.fileURL, let note = findNote(by: fileURL) {
-            // Valid note file
-            print("📝 selectTab: Loading note \(note.title) for tab")
-            viewModel.selectNote(note)
-        } else if let fileURL = tab.fileURL {
-            // File URL exists but note not found - mark as missing
-            let filename = fileURL.lastPathComponent
-            if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
-                openTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+        // Save current note before switching tabs
+        Task {
+            await saveCurrentNoteIfNeeded()
+            await MainActor.run {
+                isSelectingTab = true  // Prevent onChange from updating this tab
+                selectedTabID = tab.id
+                
+                if tab.isFileMissing {
+                    // Missing file tab - show empty state with message
+                    viewModel.currentNote = nil
+                    viewModel.selectedNoteItem = nil
+                } else if tab.isEmpty {
+                    // Empty tab
+                    viewModel.currentNote = nil
+                    viewModel.selectedNoteItem = nil
+                } else if let fileURL = tab.fileURL, let note = findNote(by: fileURL) {
+                    // Valid note file
+                    print("📝 selectTab: Loading note \(note.title) for tab")
+                    viewModel.selectNote(note)
+                } else if let fileURL = tab.fileURL {
+                    // File URL exists but note not found - mark as missing
+                    let filename = fileURL.lastPathComponent
+                    if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
+                        openTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+                    }
+                    viewModel.currentNote = nil
+                    viewModel.selectedNoteItem = nil
+                }
+                
+                // Reset flag after a short delay to ensure onChange has processed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isSelectingTab = false
+                }
             }
-            viewModel.currentNote = nil
-            viewModel.selectedNoteItem = nil
-        }
-        
-        // Reset flag after a short delay to ensure onChange has processed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            isSelectingTab = false
         }
     }
     
     private func closeTab(_ tab: TabItem) {
         guard let index = openTabs.firstIndex(where: { $0.id == tab.id }) else { return }
         
-        openTabs.remove(at: index)
-        
+        // If closing the current tab, save before switching
         if selectedTabID == tab.id {
-            if !openTabs.isEmpty {
-                let newIndex = min(index, openTabs.count - 1)
-                selectTab(openTabs[newIndex])
-            } else {
-                selectedTabID = nil
-                viewModel.currentNote = nil
-                viewModel.selectedNoteItem = nil
+            Task {
+                await saveCurrentNoteIfNeeded()
+                await MainActor.run {
+                    openTabs.remove(at: index)
+                    
+                    if !openTabs.isEmpty {
+                        let newIndex = min(index, openTabs.count - 1)
+                        selectTab(openTabs[newIndex])
+                    } else {
+                        selectedTabID = nil
+                        viewModel.currentNote = nil
+                        viewModel.selectedNoteItem = nil
+                    }
+                }
             }
+        } else {
+            openTabs.remove(at: index)
         }
     }
     
@@ -367,7 +437,8 @@ struct ContentView: View {
             }
             return nil
         }
-        return searchItems(viewModel.noteItems)
+        // Search in allNoteItems (complete hierarchy) instead of noteItems (filtered for sidebar)
+        return searchItems(viewModel.allNoteItems)
     }
     
     // MARK: - Tab Persistence

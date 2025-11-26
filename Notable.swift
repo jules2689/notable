@@ -28,6 +28,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             
+            // Remove help search field from menu (with delay to ensure menu is set up)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self.removeHelpSearchField()
+            }
+            
             // Observe new windows being created
             NotificationCenter.default.addObserver(
                 self,
@@ -41,6 +46,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self,
                 selector: #selector(windowDidUpdate(_:)),
                 name: NSWindow.didUpdateNotification,
+                object: nil
+            )
+            
+            // Observe menu updates to remove help search if it reappears
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(menuDidChange(_:)),
+                name: NSMenu.didChangeItemNotification,
                 object: nil
             )
             
@@ -128,6 +141,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.tab.title = ""
         window.isMovable = false  // Disable native dragging so tab dragging works
     }
+    
+    private func removeHelpSearchField() {
+        guard let helpMenu = NSApp.mainMenu?.item(withTitle: "Help")?.submenu else { return }
+        
+        // Find and remove the help search field
+        // The search field is typically an NSMenuItem with a custom view containing NSSearchField
+        var itemsToRemove: [NSMenuItem] = []
+        
+        for item in helpMenu.items {
+            // Check if the item has a view with a search field
+            if let view = item.view {
+                // Check if the view itself is a search field or contains one
+                if view.isKind(of: NSSearchField.self) {
+                    itemsToRemove.append(item)
+                } else {
+                    // Check subviews recursively
+                    func hasSearchField(in view: NSView) -> Bool {
+                        if view.isKind(of: NSSearchField.self) {
+                            return true
+                        }
+                        return view.subviews.contains(where: hasSearchField)
+                    }
+                    if hasSearchField(in: view) {
+                        itemsToRemove.append(item)
+                    }
+                }
+            }
+        }
+        
+        // Remove all found search field items
+        for item in itemsToRemove {
+            helpMenu.removeItem(item)
+        }
+    }
+    
+    @objc func menuDidChange(_ notification: Notification) {
+        // Re-remove help search field if it reappears
+        removeHelpSearchField()
+    }
 }
 
 @main
@@ -147,12 +199,35 @@ struct Notable: App {
                 NewNoteButton()
             }
             
+            // Add Close to File menu (after New)
+            CommandGroup(after: .newItem) {
+                Button("Close") {
+                    NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: .command)
+            }
+            
             CommandGroup(replacing: .saveItem) {
                 SaveButton()
             }
             
-            CommandGroup(after: .appSettings) {
+            // Add Settings to the app menu (after About)
+            CommandGroup(after: .appInfo) {
+                Divider()
                 SettingsButton()
+            }
+            
+            // Help menu
+            CommandGroup(replacing: .help) {
+                HelpButton()
+                Divider()
+                KeyboardShortcutsButton()
+                Divider()
+                Button("Report a Bug") {
+                    if let url = URL(string: "https://github.com/jules2689/notable/issues") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
             }
         }
     }
@@ -193,6 +268,31 @@ struct SettingsButton: View {
         }
         .keyboardShortcut(",", modifiers: .command)
         .disabled(showingSettings == nil)
+    }
+}
+
+struct HelpButton: View {
+    @FocusedValue(\.notesViewModel) private var viewModel: NotesViewModel?
+    @FocusedValue(\.showingHelp) private var showingHelp: Binding<Bool>?
+
+    var body: some View {
+        Button("Notable Help") {
+            showingHelp?.wrappedValue = true
+        }
+        .keyboardShortcut("?", modifiers: .command)
+        .disabled(viewModel == nil || showingHelp == nil)
+    }
+}
+
+struct KeyboardShortcutsButton: View {
+    @FocusedValue(\.showingKeyboardShortcuts) private var showingKeyboardShortcuts: Binding<Bool>?
+
+    var body: some View {
+        Button("Keyboard Shortcuts") {
+            showingKeyboardShortcuts?.wrappedValue = true
+        }
+        .keyboardShortcut("/", modifiers: .command)
+        .disabled(showingKeyboardShortcuts == nil)
     }
 }
 

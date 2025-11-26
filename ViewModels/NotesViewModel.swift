@@ -6,7 +6,8 @@ import SwiftUI
 @MainActor
 class NotesViewModel: @unchecked Sendable {
     var fileSystemService: FileSystemService
-    var noteItems: [NoteItem] = []
+    var noteItems: [NoteItem] = []  // Filtered items for sidebar display
+    var allNoteItems: [NoteItem] = []  // Complete unfiltered hierarchy for tab lookups
     var selectedNoteItem: NoteItem?
     var currentNote: Note?
     var isLoading = false
@@ -60,12 +61,14 @@ class NotesViewModel: @unchecked Sendable {
         let previousSelectedItemFileURL = selectedNoteItem?.fileURL
 
         do {
-            noteItems = try await fileSystemService.loadNoteHierarchy()
+            let loadedItems = try await fileSystemService.loadNoteHierarchy()
+            allNoteItems = loadedItems  // Store complete hierarchy
+            noteItems = loadedItems  // Also set as current display items
             
             // Restore selection after reload by matching file URLs
             if let previousFileURL = previousNoteFileURL {
-                // Find the note with matching file URL in the newly loaded items
-                if let matchingNote = findNote(by: previousFileURL, in: noteItems) {
+                // Find the note with matching file URL in the complete hierarchy (allNoteItems)
+                if let matchingNote = findNote(by: previousFileURL, in: allNoteItems) {
                     // Reload the note directly from disk to ensure we have the absolute latest content
                     // This is important after saves to ensure we get the saved content
                     if let freshNote = Note(fromFileURL: previousFileURL) {
@@ -83,7 +86,7 @@ class NotesViewModel: @unchecked Sendable {
                 }
             } else if let previousFileURL = previousSelectedItemFileURL {
                 // If we had a folder selected, try to restore it
-                if let matchingItem = findItem(by: previousFileURL, in: noteItems) {
+                if let matchingItem = findItem(by: previousFileURL, in: allNoteItems) {
                     selectedNoteItem = matchingItem
                     if case .note(let note) = matchingItem {
                         currentNote = note
@@ -307,12 +310,14 @@ class NotesViewModel: @unchecked Sendable {
 
     func searchNotes(query: String) async {
         guard !query.isEmpty else {
-            await loadNotes()
+            // Clear search: restore full hierarchy to noteItems
+            noteItems = allNoteItems
             return
         }
 
         do {
             let results = try await fileSystemService.searchNotes(query: query)
+            // Only update noteItems (for sidebar display), keep allNoteItems intact
             noteItems = results.map { .note($0) }
         } catch {
             errorMessage = "Failed to search notes: \(error.localizedDescription)"

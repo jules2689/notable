@@ -26,6 +26,9 @@
 		AA0025 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0025 /* KeychainHelper.swift */; };
 		AA0027 /* WindowDragView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0027 /* WindowDragView.swift */; };
 		AA0028 /* TabItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0028 /* TabItem.swift */; };
+		AA0029 /* TooltipModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0029 /* TooltipModifier.swift */; };
+		AA0030 /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0030 /* KeyboardShortcutsView.swift */; };
+		AA0031 /* HelpNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0031 /* HelpNoteView.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -51,6 +54,9 @@
 		BB0025 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		BB0027 /* WindowDragView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDragView.swift; sourceTree = "<group>"; };
 		BB0028 /* TabItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabItem.swift; sourceTree = "<group>"; };
+		BB0029 /* TooltipModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooltipModifier.swift; sourceTree = "<group>"; };
+		BB0030 /* KeyboardShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsView.swift; sourceTree = "<group>"; };
+		BB0031 /* HelpNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpNoteView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +96,8 @@
 				BB0013 /* SettingsView.swift */,
 				BB0021 /* RichTextEditor.swift */,
 				BB0027 /* WindowDragView.swift */,
+				BB0030 /* KeyboardShortcutsView.swift */,
+				BB0031 /* HelpNoteView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -128,6 +136,7 @@
 			children = (
 				BB0023 /* StorageLocationManager.swift */,
 				BB0025 /* KeychainHelper.swift */,
+				BB0029 /* TooltipModifier.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -242,6 +251,9 @@
 				AA0025 /* KeychainHelper.swift in Sources */,
 				AA0027 /* WindowDragView.swift in Sources */,
 				AA0028 /* TabItem.swift in Sources */,
+				AA0029 /* TooltipModifier.swift in Sources */,
+				AA0030 /* KeyboardShortcutsView.swift in Sources */,
+				AA0031 /* HelpNoteView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

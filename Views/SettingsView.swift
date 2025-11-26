@@ -138,6 +138,7 @@ struct SettingsView: View {
                                 Button("Choose...") {
                                     showingDirectoryPicker = true
                                 }
+                                .quickTooltip("Choose custom storage location")
                             }
                             
                             if !customPath.isEmpty {
@@ -156,7 +157,7 @@ struct SettingsView: View {
                                             .foregroundStyle(pathCopied ? .green : .secondary)
                                     }
                                     .buttonStyle(.plain)
-                                    .help("Copy path to clipboard")
+                                    .quickTooltip("Copy path to clipboard")
                                 }
                             }
                         } else if storageType == .webdav {
@@ -175,6 +176,7 @@ struct SettingsView: View {
                                         testWebDAVConnection()
                                     }
                                     .disabled(isTestingConnection || webdavServerURL.isEmpty)
+                                    .quickTooltip("Test WebDAV connection")
                                     
                                     if isTestingConnection {
                                         ProgressView()
@@ -192,6 +194,7 @@ struct SettingsView: View {
                                     saveWebDAVConfiguration()
                                 }
                                 .disabled(webdavServerURL.isEmpty || webdavUsername.isEmpty || webdavPassword.isEmpty)
+                                .quickTooltip("Save WebDAV configuration")
                                 
                                 if let successMessage = successMessage {
                                     Text(successMessage)
@@ -237,7 +240,7 @@ struct SettingsView: View {
                                 .foregroundStyle(logsPathCopied ? .green : .secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("Copy logs path to clipboard")
+                        .quickTooltip("Copy logs path to clipboard")
                     }
                 }
             }
@@ -253,6 +256,7 @@ struct SettingsView: View {
                         }
                         dismiss()
                     }
+                    .quickTooltip("Close settings")
                 }
             }
             .fileImporter(
@@ -442,6 +446,7 @@ struct AppearanceRadioButton: View {
             .cornerRadius(6)
         }
         .buttonStyle(.plain)
+        .quickTooltip("Set appearance to \(title.lowercased())")
     }
 }
 

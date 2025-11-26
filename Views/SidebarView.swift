@@ -51,6 +51,7 @@ struct SidebarView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .quickTooltip("Create new note or folder")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
@@ -268,6 +269,7 @@ struct SidebarFooter: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isSaved)
+                    .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
                     
                     Spacer()
                     
@@ -324,6 +326,7 @@ struct SidebarFooter: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isSaved)
+                    .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
                     
                     // Word count and read time
                     if showWordCount {
@@ -383,6 +386,7 @@ struct SearchBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .quickTooltip("Clear search")
             }
         }
         .padding(8)
@@ -445,6 +449,7 @@ struct HierarchicalNoteItemRow: View {
                             .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
+                    .quickTooltip(isExpanded ? "Collapse folder" : "Expand folder")
                 } else {
                     // Spacer for non-folder items to align with folders
                     Spacer()
