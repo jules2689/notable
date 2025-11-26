@@ -6,6 +6,7 @@ extension Notification.Name {
     static let closeCurrentTab = Notification.Name("closeCurrentTab")
     static let newTab = Notification.Name("newTab")
     static let noteSelectedFromSidebar = Notification.Name("noteSelectedFromSidebar")
+    static let noteOpenInNewTab = Notification.Name("noteOpenInNewTab")
 }
 
 // App delegate to configure window appearance (using custom tabs instead of native)

@@ -408,11 +408,16 @@ struct HierarchicalNoteItemRow: View {
         .onTapGesture {
             switch item {
             case .note(let note):
-                print("📝 SidebarView: Selecting note \(note.title)")
+                let isShiftHeld = NSEvent.modifierFlags.contains(.shift)
+                print("📝 SidebarView: Selecting note \(note.title), shift=\(isShiftHeld)")
                 viewModel.selectNote(note)
-                // Notify ContentView that a note was selected
-                print("📝 SidebarView: Posting notification for \(note.title)")
-                NotificationCenter.default.post(name: .noteSelectedFromSidebar, object: note)
+                
+                // Shift-click opens in new tab, regular click updates current tab
+                if isShiftHeld {
+                    NotificationCenter.default.post(name: .noteOpenInNewTab, object: note)
+                } else {
+                    NotificationCenter.default.post(name: .noteSelectedFromSidebar, object: note)
+                }
             case .folder(let folder):
                 // Toggle expansion when clicking on folder
                 viewModel.toggleFolderExpansion(folder)

@@ -108,6 +108,12 @@ struct ContentView: View {
                 print("📝 Failed to cast notification.object to Note")
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .noteOpenInNewTab)) { notification in
+            print("📝 Received noteOpenInNewTab notification (shift-click)")
+            if let note = notification.object as? Note {
+                openNoteInNewTab(note)
+            }
+        }
         .onChange(of: viewModel.currentNote?.id) { oldID, newID in
             // Only update tab when selecting from sidebar, not when switching tabs
             guard !isSelectingTab else {
@@ -136,6 +142,18 @@ struct ContentView: View {
         selectedTabID = newTab.id
         viewModel.currentNote = nil
         viewModel.selectedNoteItem = nil
+    }
+    
+    private func openNoteInNewTab(_ note: Note) {
+        isSelectingTab = true  // Prevent onChange from interfering
+        let newTab = TabItem.forNote(note)
+        openTabs.append(newTab)
+        selectedTabID = newTab.id
+        
+        // Reset flag after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isSelectingTab = false
+        }
     }
     
     private func updateCurrentTabWithNote(_ note: Note) {
