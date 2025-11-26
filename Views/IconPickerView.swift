@@ -11,7 +11,6 @@ struct IconPickerView: View {
     
     // Popular emoji categories - static to avoid recomputation
     private static let emojiCategories: [(name: String, emojis: [String])] = [
-        ("Frequently Used", ["📝", "📄", "📋", "📌", "📍", "⭐", "🔥", "💡", "🎯", "✅", "❌", "⚠️", "💬", "📊", "📈", "📉", "🎨", "🎵", "🎬", "📷", "🏠", "🚀", "💻", "📱", "🎮", "📚", "🎓", "🏆", "🎁", "🎉"]),
         ("Objects", ["📝", "📄", "📋", "📌", "📍", "📊", "📈", "📉", "📷", "📹", "🎥", "📺", "📻", "📱", "💻", "⌨️", "🖥️", "🖨️", "📞", "☎️", "📠", "📧", "📮", "📬", "📭", "📦", "📯", "📰", "📑", "📜", "📎", "🖇️", "📏", "📐", "✂️", "🗑️", "🔒", "🔓", "🔐", "🔑"]),
         ("Symbols", ["⭐", "🌟", "✨", "💫", "🔥", "💥", "⚡", "☀️", "🌙", "💎", "🎯", "🎪", "🎭", "🎨", "🎬", "🎵", "🎤", "🎧", "🎸", "🎹", "🥁", "🎺", "🎻", "🎷"]),
         ("Activities", ["🎨", "🎵", "🎬", "🎮", "🎯", "🎲", "🎪", "🎭", "🎤", "🎧", "🎸", "🎹", "🥁", "🎺", "🎻", "🎷", "⚽️", "🏀", "🏈", "⚾️", "🎾", "🏐", "🏉", "🎱"]),
@@ -19,13 +18,268 @@ struct IconPickerView: View {
         ("Nature", ["🌱", "🌲", "🌳", "🌴", "🌵", "🌷", "🌸", "🌹", "🌺", "🌻", "🌼", "🌾", "🌿", "🍀", "🍁", "🍂", "🍃", "🌍", "🌎", "🌏", "🌐", "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌙", "🌚", "🌛", "🌜", "🌝", "🌞", "⭐", "🌟", "✨", "💫", "🔥", "☄️", "💥", "☀️", "🌤️", "⛅", "🌥️", "☁️", "🌦️", "🌧️", "⛈️", "🌩️", "⚡", "☔", "❄️", "⛄", "🌨️", "💨", "🌪️", "🌫️", "🌊"]),
     ]
     
+    // Mapping of emojis to human-readable keywords for search
+    private static let emojiKeywords: [String: [String]] = [
+        // Frequently Used
+        "📝": ["memo", "note", "write", "document", "paper"],
+        "📄": ["page", "document", "paper", "file"],
+        "📋": ["clipboard", "list", "checklist", "notes"],
+        "📌": ["pin", "pushpin", "tack", "location"],
+        "📍": ["location", "pin", "place", "marker", "map"],
+        "⭐": ["star", "favorite", "rating", "important"],
+        "🔥": ["fire", "flame", "hot", "burning", "lit"],
+        "💡": ["lightbulb", "idea", "bright", "light", "bulb"],
+        "🎯": ["target", "dart", "goal", "aim", "bullseye"],
+        "✅": ["check", "checkmark", "done", "complete", "yes"],
+        "❌": ["cross", "x", "no", "wrong", "cancel", "delete"],
+        "⚠️": ["warning", "alert", "caution", "danger"],
+        "💬": ["speech", "bubble", "chat", "message", "talk"],
+        "📊": ["chart", "bar", "graph", "data", "statistics"],
+        "📈": ["chart", "up", "growth", "increase", "trend"],
+        "📉": ["chart", "down", "decrease", "fall", "trend"],
+        "🎨": ["art", "paint", "palette", "artist", "creative"],
+        "🎵": ["music", "note", "song", "melody"],
+        "🎬": ["movie", "film", "camera", "cinema", "clapper"],
+        "📷": ["camera", "photo", "picture", "photography"],
+        "🏠": ["house", "home", "building"],
+        "🚀": ["rocket", "launch", "space", "fast", "speed"],
+        "💻": ["computer", "laptop", "pc", "mac"],
+        "📱": ["phone", "mobile", "smartphone", "cell"],
+        "🎮": ["game", "controller", "gaming", "play"],
+        "📚": ["books", "library", "study", "education"],
+        "🎓": ["graduation", "cap", "degree", "graduate", "school"],
+        "🏆": ["trophy", "award", "winner", "champion"],
+        "🎁": ["gift", "present", "box", "wrapped"],
+        "🎉": ["party", "celebration", "confetti", "tada"],
+        
+        // Objects
+        "📹": ["video", "camera", "recording"],
+        "🎥": ["movie", "camera", "film", "cinema"],
+        "📺": ["tv", "television", "screen"],
+        "📻": ["radio", "music", "broadcast"],
+        "⌨️": ["keyboard", "type", "keys"],
+        "🖥️": ["computer", "desktop", "monitor", "screen"],
+        "🖨️": ["printer", "print"],
+        "📞": ["phone", "telephone", "call"],
+        "☎️": ["phone", "telephone", "call"],
+        "📠": ["fax", "machine"],
+        "📧": ["email", "mail", "message"],
+        "📮": ["mailbox", "post", "letter"],
+        "📬": ["mailbox", "mail", "letter"],
+        "📭": ["mailbox", "open", "mail"],
+        "📦": ["package", "box", "parcel", "delivery"],
+        "📯": ["postal", "horn", "mail"],
+        "📰": ["newspaper", "news", "paper"],
+        "📑": ["bookmark", "tabs", "page"],
+        "📜": ["scroll", "document", "paper"],
+        "📎": ["paperclip", "attach", "clip"],
+        "🖇️": ["paperclips", "linked", "attach"],
+        "📏": ["ruler", "measure", "straight"],
+        "📐": ["triangle", "ruler", "math"],
+        "✂️": ["scissors", "cut", "clip"],
+        "🗑️": ["trash", "delete", "bin", "waste"],
+        "🔒": ["lock", "locked", "secure", "private"],
+        "🔓": ["unlock", "unlocked", "open"],
+        "🔐": ["lock", "key", "secure"],
+        "🔑": ["key", "unlock", "access"],
+        
+        // Symbols
+        "🌟": ["star", "glowing", "bright", "sparkle"],
+        "✨": ["sparkles", "magic", "shine", "glitter"],
+        "💫": ["dizzy", "star", "sparkle"],
+        "💥": ["explosion", "boom", "burst"],
+        "⚡": ["lightning", "bolt", "electric", "zap"],
+        "☀️": ["sun", "sunny", "bright", "day"],
+        "🌙": ["moon", "night", "crescent"],
+        "💎": ["diamond", "gem", "jewel", "precious"],
+        "🎪": ["circus", "tent", "entertainment"],
+        "🎭": ["theater", "drama", "masks", "acting"],
+        "🎤": ["microphone", "mic", "sing", "karaoke"],
+        "🎧": ["headphones", "music", "listen", "audio"],
+        "🎸": ["guitar", "music", "rock"],
+        "🎹": ["piano", "keyboard", "music"],
+        "🥁": ["drum", "music", "beat"],
+        "🎺": ["trumpet", "horn", "music"],
+        "🎻": ["violin", "music", "orchestra"],
+        "🎷": ["saxophone", "sax", "music", "jazz"],
+        
+        // Activities
+        "🎲": ["dice", "game", "gamble", "random"],
+        "⚽️": ["soccer", "football", "ball", "sport"],
+        "🏀": ["basketball", "ball", "sport"],
+        "🏈": ["football", "american", "sport"],
+        "⚾️": ["baseball", "ball", "sport"],
+        "🎾": ["tennis", "ball", "sport"],
+        "🏐": ["volleyball", "ball", "sport"],
+        "🏉": ["rugby", "ball", "sport"],
+        "🎱": ["pool", "billiards", "8ball", "game"],
+        
+        // Food
+        "🍎": ["apple", "red", "fruit"],
+        "🍊": ["orange", "fruit", "citrus"],
+        "🍋": ["lemon", "yellow", "fruit", "sour"],
+        "🍌": ["banana", "fruit", "yellow"],
+        "🍉": ["watermelon", "fruit", "summer"],
+        "🍇": ["grapes", "fruit", "wine"],
+        "🍓": ["strawberry", "fruit", "red"],
+        "🍈": ["melon", "fruit"],
+        "🍒": ["cherries", "fruit", "red"],
+        "🍑": ["peach", "fruit"],
+        "🥭": ["mango", "fruit", "tropical"],
+        "🍍": ["pineapple", "fruit", "tropical"],
+        "🥥": ["coconut", "fruit", "tropical"],
+        "🥝": ["kiwi", "fruit", "green"],
+        "🍅": ["tomato", "vegetable", "red"],
+        "🍆": ["eggplant", "vegetable", "purple"],
+        "🥑": ["avocado", "fruit", "green"],
+        "🥦": ["broccoli", "vegetable", "green"],
+        "🥬": ["lettuce", "vegetable", "green", "salad"],
+        "🥒": ["cucumber", "vegetable", "green"],
+        "🌶️": ["pepper", "chili", "spicy", "hot"],
+        "🌽": ["corn", "maize", "vegetable"],
+        "🥕": ["carrot", "vegetable", "orange"],
+        "🥔": ["potato", "vegetable"],
+        "🍠": ["sweet", "potato", "yam"],
+        "🥐": ["croissant", "bread", "french"],
+        "🥯": ["bagel", "bread"],
+        "🍞": ["bread", "loaf"],
+        "🥖": ["baguette", "bread", "french"],
+        "🥨": ["pretzel", "bread", "twisted"],
+        "🧀": ["cheese", "dairy"],
+        "🥚": ["egg", "chicken"],
+        "🍳": ["cooking", "pan", "fried", "egg"],
+        "🥞": ["pancakes", "breakfast"],
+        "🥓": ["bacon", "meat", "breakfast"],
+        "🥩": ["meat", "steak", "beef"],
+        "🍗": ["chicken", "leg", "meat"],
+        "🍖": ["meat", "bone"],
+        "🌭": ["hotdog", "sausage", "frank"],
+        "🍔": ["hamburger", "burger", "fast", "food"],
+        "🍟": ["fries", "french", "potato"],
+        "🍕": ["pizza", "slice"],
+        "🥪": ["sandwich"],
+        "🥙": ["wrap", "sandwich", "pita"],
+        "🌮": ["taco", "mexican"],
+        "🌯": ["burrito", "wrap", "mexican"],
+        "🥗": ["salad", "green", "healthy"],
+        "🥘": ["pot", "cooking", "stew"],
+        "🥫": ["can", "canned", "food"],
+        "🍝": ["spaghetti", "pasta", "italian"],
+        "🍜": ["noodles", "ramen", "soup"],
+        "🍲": ["pot", "stew", "cooking"],
+        "🍛": ["curry", "rice", "indian"],
+        "🍣": ["sushi", "japanese"],
+        "🍱": ["bento", "box", "japanese"],
+        "☕️": ["coffee", "cafe", "hot", "drink"],
+        "🍵": ["tea", "cup", "green", "drink"],
+        "🥤": ["drink", "cup", "straw", "soda"],
+        "🍶": ["sake", "bottle", "japanese"],
+        "🍺": ["beer", "mug", "drink"],
+        "🍻": ["beers", "cheers", "drink"],
+        "🥂": ["champagne", "toast", "celebration"],
+        "🍷": ["wine", "glass", "red"],
+        "🥃": ["whiskey", "tumbler", "drink"],
+        "🍸": ["cocktail", "martini", "drink"],
+        "🍹": ["tropical", "drink", "cocktail"],
+        "🍾": ["champagne", "bottle", "celebration"],
+        
+        // Nature
+        "🌱": ["seedling", "plant", "grow", "sprout"],
+        "🌲": ["tree", "evergreen", "pine"],
+        "🌳": ["tree", "deciduous", "oak"],
+        "🌴": ["palm", "tree", "tropical", "coconut"],
+        "🌵": ["cactus", "desert", "plant"],
+        "🌷": ["tulip", "flower", "spring"],
+        "🌸": ["cherry", "blossom", "flower", "spring"],
+        "🌹": ["rose", "flower", "red", "love"],
+        "🌺": ["hibiscus", "flower", "tropical"],
+        "🌻": ["sunflower", "flower", "yellow"],
+        "🌼": ["flower", "blossom"],
+        "🌾": ["rice", "grain", "harvest"],
+        "🌿": ["herb", "leaf", "green"],
+        "🍀": ["clover", "four", "leaf", "lucky"],
+        "🍁": ["maple", "leaf", "autumn", "fall"],
+        "🍂": ["fallen", "leaf", "autumn", "fall"],
+        "🍃": ["leaf", "wind", "blowing"],
+        "🌍": ["earth", "globe", "world", "europe", "africa"],
+        "🌎": ["earth", "globe", "world", "americas"],
+        "🌏": ["earth", "globe", "world", "asia", "australia"],
+        "🌐": ["globe", "internet", "web", "world"],
+        "🌑": ["new", "moon", "dark"],
+        "🌒": ["waxing", "crescent", "moon"],
+        "🌓": ["first", "quarter", "moon"],
+        "🌔": ["waxing", "gibbous", "moon"],
+        "🌕": ["full", "moon"],
+        "🌖": ["waning", "gibbous", "moon"],
+        "🌗": ["last", "quarter", "moon"],
+        "🌘": ["waning", "crescent", "moon"],
+        "🌚": ["new", "moon", "face"],
+        "🌛": ["first", "quarter", "moon", "face"],
+        "🌜": ["last", "quarter", "moon", "face"],
+        "🌝": ["full", "moon", "face"],
+        "🌞": ["sun", "face", "happy"],
+        "☄️": ["comet", "space", "tail"],
+        "☁️": ["cloud", "weather"],
+        "🌤️": ["sun", "cloud", "partly", "cloudy"],
+        "⛅": ["sun", "cloud", "partly", "cloudy"],
+        "🌥️": ["sun", "cloud", "behind"],
+        "🌦️": ["sun", "rain", "cloud"],
+        "🌧️": ["rain", "cloud", "weather"],
+        "⛈️": ["thunderstorm", "lightning", "rain"],
+        "🌩️": ["lightning", "cloud"],
+        "☔": ["umbrella", "rain", "weather"],
+        "❄️": ["snowflake", "snow", "winter", "cold"],
+        "⛄": ["snowman", "snow", "winter"],
+        "🌨️": ["snow", "cloud"],
+        "💨": ["wind", "dash", "fast", "blow"],
+        "🌪️": ["tornado", "cyclone", "storm"],
+        "🌫️": ["fog", "mist", "cloudy"],
+        "🌊": ["wave", "water", "ocean", "sea"],
+    ]
+    
     private var filteredEmojis: [(name: String, emojis: [String])] {
         if searchText.isEmpty {
             return Self.emojiCategories
         }
         
-        // For now, show all if searching (search not implemented yet)
-        return Self.emojiCategories
+        let searchLower = searchText.lowercased().trimmingCharacters(in: .whitespaces)
+        
+        // Filter categories and emojis based on search
+        return Self.emojiCategories.compactMap { category in
+            // Check if category name matches
+            let categoryMatches = category.name.lowercased().contains(searchLower)
+            
+            // Filter emojis that match the search
+            let matchingEmojis = category.emojis.filter { emoji in
+                // Check if the emoji character itself matches
+                if emoji.contains(searchText) {
+                    return true
+                }
+                
+                // Check if category matches (show all emojis in matching categories)
+                if categoryMatches {
+                    return true
+                }
+                
+                // Check if any keywords match
+                if let keywords = Self.emojiKeywords[emoji] {
+                    for keyword in keywords {
+                        if keyword.lowercased().contains(searchLower) {
+                            return true
+                        }
+                    }
+                }
+                
+                return false
+            }
+            
+            // Only include category if it has matching emojis
+            if !matchingEmojis.isEmpty {
+                return (name: category.name, emojis: matchingEmojis)
+            }
+            
+            return nil
+        }
     }
     
     var body: some View {
