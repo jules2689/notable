@@ -7,6 +7,8 @@ extension Notification.Name {
     static let newTab = Notification.Name("newTab")
     static let noteSelectedFromSidebar = Notification.Name("noteSelectedFromSidebar")
     static let noteOpenInNewTab = Notification.Name("noteOpenInNewTab")
+    static let moveTabLeft = Notification.Name("moveTabLeft")
+    static let moveTabRight = Notification.Name("moveTabRight")
 }
 
 // App delegate to configure window appearance (using custom tabs instead of native)
@@ -42,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 object: nil
             )
             
-            // Intercept CMD-W and CMD-T to handle tabs
+            // Intercept CMD-W, CMD-T, CMD-Shift-[, CMD-Shift-] to handle tabs
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 if event.modifierFlags.contains(.command) {
                     if event.charactersIgnoringModifiers == "w" {
@@ -51,6 +53,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     if event.charactersIgnoringModifiers == "t" {
                         NotificationCenter.default.post(name: .newTab, object: nil)
+                        return nil
+                    }
+                    // CMD+Shift+[ to move tab left
+                    if event.modifierFlags.contains(.shift) && event.charactersIgnoringModifiers == "[" {
+                        NotificationCenter.default.post(name: .moveTabLeft, object: nil)
+                        return nil
+                    }
+                    // CMD+Shift+] to move tab right
+                    if event.modifierFlags.contains(.shift) && event.charactersIgnoringModifiers == "]" {
+                        NotificationCenter.default.post(name: .moveTabRight, object: nil)
                         return nil
                     }
                 }
@@ -89,6 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.tabbingMode = .disallowed
         window.toolbar = nil
         window.tab.title = ""
+        window.isMovable = false  // Disable native dragging so tab dragging works
     }
 }
 

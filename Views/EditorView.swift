@@ -1,5 +1,26 @@
 import SwiftUI
 import Combine
+import AppKit
+
+// NSView that enables window dragging when clicked
+class WindowDragNSView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+    
+    override var mouseDownCanMoveWindow: Bool { true }
+}
+
+// SwiftUI wrapper for window drag area
+struct WindowDragView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = WindowDragNSView()
+        view.wantsLayer = true
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
 
 struct EditorView: View {
     var viewModel: NotesViewModel
@@ -19,6 +40,7 @@ struct EditorView: View {
     @State private var editingTabID: UUID?
     @State private var editingTabTitle: String = ""
     @FocusState private var isTabTitleFocused: Bool
+    @State private var draggedTab: TabItem?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,29 +58,34 @@ struct EditorView: View {
     // MARK: - Tab Bar
     
     private var tabBar: some View {
-        HStack(spacing: 0) {
-            // Tabs
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 1) {
-                    ForEach(openTabs) { tab in
-                        tabItem(tab)
+        ZStack {
+            // Window drag area (invisible, covers entire tab bar for dragging)
+            WindowDragView()
+            
+            HStack(spacing: 0) {
+                // Tabs
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 1) {
+                        ForEach(openTabs) { tab in
+                            tabItem(tab)
+                        }
                     }
+                    .padding(.leading, 8)
                 }
-                .padding(.leading, 8)
+                
+                Spacer()
+                
+                // New tab button
+                Button(action: onNewTab) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 8)
             }
-            
-            Spacer()
-            
-            // New tab button
-            Button(action: onNewTab) {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 8)
         }
         .frame(height: 36)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -69,7 +96,7 @@ struct EditorView: View {
         let isHovered = hoveredTabID == tab.id
         let isEditing = editingTabID == tab.id
         
-        return HStack(spacing: 6) {
+        return HStack(spacing: 4) {
             if isEditing {
                 TextField("Tab name", text: $editingTabTitle)
                     .font(.system(size: 12))
@@ -133,6 +160,64 @@ struct EditorView: View {
         }
         .onHover { isHovered in
             hoveredTabID = isHovered ? tab.id : nil
+        }
+        .opacity(draggedTab?.id == tab.id ? 0.5 : 1.0)
+        .draggable(tab.id.uuidString) {
+            // Drag preview
+            HStack(spacing: 4) {
+                Text(tab.title)
+                    .font(.system(size: 12))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(6)
+            .onAppear {
+                draggedTab = tab
+            }
+        }
+        .dropDestination(for: String.self) { items, location in
+            guard let draggedTab = draggedTab,
+                  draggedTab.id != tab.id,
+                  let fromIndex = openTabs.firstIndex(where: { $0.id == draggedTab.id }),
+                  let toIndex = openTabs.firstIndex(where: { $0.id == tab.id }) else {
+                return false
+            }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                openTabs.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+            }
+            self.draggedTab = nil
+            return true
+        }
+        .contextMenu {
+            if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
+                if index > 0 {
+                    Button("Move Left") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            openTabs.move(fromOffsets: IndexSet(integer: index), toOffset: index - 1)
+                        }
+                    }
+                }
+                if index < openTabs.count - 1 {
+                    Button("Move Right") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            openTabs.move(fromOffsets: IndexSet(integer: index), toOffset: index + 2)
+                        }
+                    }
+                }
+                Divider()
+                Button("Close Tab") {
+                    onCloseTab(tab)
+                }
+                if openTabs.count > 1 {
+                    Button("Close Other Tabs") {
+                        let tabsToClose = openTabs.filter { $0.id != tab.id }
+                        for t in tabsToClose {
+                            onCloseTab(t)
+                        }
+                    }
+                }
+            }
         }
     }
     

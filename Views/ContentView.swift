@@ -114,6 +114,12 @@ struct ContentView: View {
                 openNoteInNewTab(note)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .moveTabLeft)) { _ in
+            moveCurrentTab(direction: -1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .moveTabRight)) { _ in
+            moveCurrentTab(direction: 1)
+        }
         .onChange(of: viewModel.currentNote?.id) { oldID, newID in
             // Only update tab when selecting from sidebar, not when switching tabs
             guard !isSelectingTab else {
@@ -153,6 +159,18 @@ struct ContentView: View {
         // Reset flag after a short delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             isSelectingTab = false
+        }
+    }
+    
+    private func moveCurrentTab(direction: Int) {
+        guard let currentTabID = selectedTabID,
+              let currentIndex = openTabs.firstIndex(where: { $0.id == currentTabID }) else { return }
+        
+        let newIndex = currentIndex + direction
+        guard newIndex >= 0 && newIndex < openTabs.count else { return }
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            openTabs.move(fromOffsets: IndexSet(integer: currentIndex), toOffset: direction > 0 ? newIndex + 1 : newIndex)
         }
     }
     
