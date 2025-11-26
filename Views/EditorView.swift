@@ -58,34 +58,29 @@ struct EditorView: View {
     // MARK: - Tab Bar
     
     private var tabBar: some View {
-        ZStack {
-            // Window drag area (invisible, covers entire tab bar for dragging)
-            WindowDragView()
-            
-            HStack(spacing: 0) {
-                // Tabs
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 1) {
-                        ForEach(openTabs) { tab in
-                            tabItem(tab)
-                        }
-                    }
-                    .padding(.leading, 8)
+        HStack(spacing: 0) {
+            // Tabs (only takes space needed)
+            HStack(spacing: 1) {
+                ForEach(openTabs) { tab in
+                    tabItem(tab)
                 }
-                
-                Spacer()
-                
-                // New tab button
-                Button(action: onNewTab) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 8)
             }
+            .padding(.leading, 8)
+            
+            // Empty space = window drag area
+            WindowDragView()
+                .frame(maxWidth: .infinity)
+            
+            // New tab button
+            Button(action: onNewTab) {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 8)
         }
         .frame(height: 36)
         .background(Color(nsColor: .windowBackgroundColor))
