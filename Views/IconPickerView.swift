@@ -9,7 +9,7 @@ struct IconPickerView: View {
     @State private var searchText = ""
     @State private var showingCustomIconPicker = false
     
-    // Popular emoji categories - static to avoid recomputation, reduced for faster loading
+    // Popular emoji categories - static to avoid recomputation
     private static let emojiCategories: [(name: String, emojis: [String])] = [
         ("Frequently Used", ["📝", "📄", "📋", "📌", "📍", "⭐", "🔥", "💡", "🎯", "✅", "❌", "⚠️", "💬", "📊", "📈", "📉", "🎨", "🎵", "🎬", "📷", "🏠", "🚀", "💻", "📱", "🎮", "📚", "🎓", "🏆", "🎁", "🎉"]),
         ("Objects", ["📝", "📄", "📋", "📌", "📍", "📊", "📈", "📉", "📷", "📹", "🎥", "📺", "📻", "📱", "💻", "⌨️", "🖥️", "🖨️", "📞", "☎️", "📠", "📧", "📮", "📬", "📭", "📦", "📯", "📰", "📑", "📜", "📎", "🖇️", "📏", "📐", "✂️", "🗑️", "🔒", "🔓", "🔐", "🔑"]),
@@ -24,14 +24,8 @@ struct IconPickerView: View {
             return Self.emojiCategories
         }
         
-        let searchLower = searchText.lowercased()
-        return Self.emojiCategories.map { category in
-            let filtered = category.emojis.filter { emoji in
-                // Simple search - could be enhanced
-                true // For now, show all if searching
-            }
-            return (name: category.name, emojis: filtered)
-        }.filter { !$0.emojis.isEmpty }
+        // For now, show all if searching (search not implemented yet)
+        return Self.emojiCategories
     }
     
     var body: some View {
@@ -64,9 +58,9 @@ struct IconPickerView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
             
-            // Emoji grid - optimized for fast rendering
+            // Emoji grid - use simpler layout for faster rendering
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ForEach(filteredEmojis, id: \.name) { category in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(category.name)
@@ -74,8 +68,8 @@ struct IconPickerView: View {
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal)
                             
-                            // Fixed column count for faster layout
-                            let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 8)
+                            // Use LazyVGrid for better performance
+                            let columns = [GridItem](repeating: GridItem(.flexible(), spacing: 8), count: 8)
                             LazyVGrid(columns: columns, spacing: 8) {
                                 ForEach(category.emojis, id: \.self) { emoji in
                                     Button(action: {

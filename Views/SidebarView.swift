@@ -404,7 +404,6 @@ struct HierarchicalNoteItemRow: View {
     @State private var showingDeleteAlert = false
     @State private var newName = ""
     @State private var isTargeted = false
-    @State private var showingIconPicker = false
     @State private var iconPickerNote: Note?
     
     private var isExpanded: Bool {
@@ -461,7 +460,6 @@ struct HierarchicalNoteItemRow: View {
                     // Make icon clickable to change it
                     Button(action: {
                         iconPickerNote = note
-                        showingIconPicker = true
                     }) {
                         if let icon = note.icon, !icon.isEmpty {
                             // Show custom icon or emoji
@@ -521,7 +519,6 @@ struct HierarchicalNoteItemRow: View {
                 if item.isNote, case .note(let note) = item {
                     Button {
                         iconPickerNote = note
-                        showingIconPicker = true
                     } label: {
                         Label("Change Icon...", systemImage: "tag")
                     }
@@ -648,21 +645,19 @@ struct HierarchicalNoteItemRow: View {
             
             return false
         }
-        .sheet(isPresented: $showingIconPicker) {
-            if let note = iconPickerNote {
-                IconPickerView(
-                    selectedIcon: Binding(
-                        get: { note.icon },
-                        set: { newIcon in
-                            updateNoteIcon(note: note, icon: newIcon)
-                        }
-                    ),
-                    noteFileURL: note.fileURL,
-                    onCustomIconSelected: { _ in
-                        // Icon file has been copied, updateNoteIcon will handle the rest
+        .sheet(item: $iconPickerNote) { note in
+            IconPickerView(
+                selectedIcon: Binding(
+                    get: { note.icon },
+                    set: { newIcon in
+                        updateNoteIcon(note: note, icon: newIcon)
                     }
-                )
-            }
+                ),
+                noteFileURL: note.fileURL,
+                onCustomIconSelected: { _ in
+                    // Icon file has been copied, updateNoteIcon will handle the rest
+                }
+            )
         }
     }
     

@@ -24,8 +24,12 @@ struct EditorView: View {
     @FocusState private var isTabTitleFocused: Bool
     @State private var draggedTabID: UUID?
     @State private var tabBarLeadingPadding: CGFloat = 0 // Padding for traffic lights (0 when sidebar open, 70 when closed)
-    @State private var showingIconPicker = false
-    @State private var iconPickerTabID: UUID?
+    @State private var iconPickerTabID: TabID?
+    
+    // Wrapper for UUID to use with sheet(item:)
+    struct TabID: Identifiable {
+        let id: UUID
+    }
     
     init(viewModel: NotesViewModel, editedContent: Binding<String>, isSaved: Binding<Bool>, openTabs: Binding<[TabItem]>, selectedTabID: Binding<UUID?>, columnVisibility: Binding<NavigationSplitViewVisibility>, onSaveActionReady: ((@escaping () -> Void) -> Void)?, onSelectTab: @escaping (TabItem) -> Void, onCloseTab: @escaping (TabItem) -> Void, onNewTab: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -65,14 +69,13 @@ struct EditorView: View {
                 tabBarLeadingPadding = columnVisibility == .detailOnly ? 70 : 0
             }
         }
-        .sheet(isPresented: $showingIconPicker) {
-            if let tabID = iconPickerTabID,
-               let tab = openTabs.first(where: { $0.id == tabID }) {
+        .sheet(item: $iconPickerTabID) { tabIDWrapper in
+            if let tab = openTabs.first(where: { $0.id == tabIDWrapper.id }) {
                 IconPickerView(
                     selectedIcon: Binding(
                         get: { tab.icon },
                         set: { newIcon in
-                            updateTabIcon(tabID: tabID, icon: newIcon)
+                            updateTabIcon(tabID: tabIDWrapper.id, icon: newIcon)
                         }
                     ),
                     noteFileURL: tab.fileURL,
@@ -161,8 +164,7 @@ struct EditorView: View {
             if isSelected && !tab.isEmpty && !isEditing {
                 // Show icon picker button when selected
                 Button(action: {
-                    iconPickerTabID = tab.id
-                    showingIconPicker = true
+                    iconPickerTabID = TabID(id: tab.id)
                 }) {
                     if let icon = tab.icon, !icon.isEmpty {
                         // Check if it's a custom icon (has file extension) or emoji
@@ -286,8 +288,7 @@ struct EditorView: View {
                 Divider()
                 if !tab.isEmpty {
                     Button("Change Icon...") {
-                        iconPickerTabID = tab.id
-                        showingIconPicker = true
+                        iconPickerTabID = TabID(id: tab.id)
                     }
                     Divider()
                 }
