@@ -16,6 +16,9 @@ struct EditorView: View {
     @State private var lastSavedContent: String = ""
     @FocusState private var isEditorFocused: Bool
     @State private var hoveredTabID: UUID?
+    @State private var editingTabID: UUID?
+    @State private var editingTabTitle: String = ""
+    @FocusState private var isTabTitleFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,14 +67,39 @@ struct EditorView: View {
     private func tabItem(_ tab: TabItem) -> some View {
         let isSelected = selectedTabID == tab.id
         let isHovered = hoveredTabID == tab.id
+        let isEditing = editingTabID == tab.id
         
         return HStack(spacing: 6) {
-            Text(tab.title)
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? .primary : .secondary)
+            if isEditing {
+                TextField("Tab name", text: $editingTabTitle)
+                    .font(.system(size: 12))
+                    .textFieldStyle(.plain)
+                    .frame(minWidth: 60)
+                    .focused($isTabTitleFocused)
+                    .onSubmit {
+                        finishEditingTab(tab)
+                    }
+                    .onChange(of: isTabTitleFocused) { _, focused in
+                        if !focused {
+                            finishEditingTab(tab)
+                        }
+                    }
+            } else {
+                Text(tab.title)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .onTapGesture {
+                        // Single click on title starts editing (if tab is already selected)
+                        if isSelected {
+                            startEditingTab(tab)
+                        } else {
+                            onSelectTab(tab)
+                        }
+                    }
+            }
             
-            if isHovered || isSelected {
+            if (isHovered || isSelected) && !isEditing {
                 Button(action: { onCloseTab(tab) }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 8, weight: .bold))
@@ -83,7 +111,7 @@ struct EditorView: View {
                         )
                 }
                 .buttonStyle(.plain)
-            } else {
+            } else if !isEditing {
                 Color.clear.frame(width: 16, height: 16)
             }
         }
@@ -98,10 +126,71 @@ struct EditorView: View {
                 .stroke(isSelected ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture { onSelectTab(tab) }
+        .onTapGesture {
+            if !isEditing {
+                onSelectTab(tab)
+            }
+        }
         .onHover { isHovered in
             hoveredTabID = isHovered ? tab.id : nil
         }
+    }
+    
+    private func startEditingTab(_ tab: TabItem) {
+        editingTabTitle = tab.title
+        editingTabID = tab.id
+        // Focus the text field after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isTabTitleFocused = true
+        }
+    }
+    
+    private func finishEditingTab(_ tab: TabItem) {
+        guard editingTabID == tab.id else { return }
+        
+        let newTitle = editingTabTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !newTitle.isEmpty && newTitle != tab.title {
+            // Update the tab title and rename the note if it exists
+            if let index = openTabs.firstIndex(where: { $0.id == tab.id }) {
+                openTabs[index] = TabItem(
+                    id: tab.id,
+                    noteID: tab.noteID,
+                    title: newTitle,
+                    fileURL: tab.fileURL
+                )
+                
+                // If this tab has a note, rename it
+                if let fileURL = tab.fileURL {
+                    Task {
+                        if let note = findNoteByURL(fileURL) {
+                            await viewModel.renameNote(note, to: newTitle)
+                        }
+                    }
+                }
+            }
+        }
+        
+        editingTabID = nil
+        editingTabTitle = ""
+    }
+    
+    private func findNoteByURL(_ fileURL: URL) -> Note? {
+        func searchItems(_ items: [NoteItem]) -> Note? {
+            for item in items {
+                switch item {
+                case .note(let note):
+                    if note.fileURL == fileURL {
+                        return note
+                    }
+                case .folder(let folder):
+                    if let found = searchItems(folder.children) {
+                        return found
+                    }
+                }
+            }
+            return nil
+        }
+        return searchItems(viewModel.noteItems)
     }
     
     // MARK: - Editor Content
