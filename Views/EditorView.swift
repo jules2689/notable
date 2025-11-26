@@ -52,10 +52,9 @@ struct EditorView: View {
         .ignoresSafeArea(.all, edges: .top)
         .background(Color(nsColor: .textBackgroundColor))
         .onChange(of: columnVisibility) { _, newValue in
-            // Sync tab bar padding when sidebar is dragged closed/open (not just toggled)
-            withAnimation(.smooth(duration: 0.5)) {
-                tabBarLeadingPadding = newValue == .detailOnly ? 70 : 0
-            }
+            // Sync tab bar padding instantly (no animation) to match sidebar movement
+            // This prevents bounce from conflicting animations
+            tabBarLeadingPadding = newValue == .detailOnly ? 70 : 0
         }
         .onAppear {
             // Ensure padding matches current sidebar state (in case it changed before onAppear)
@@ -104,13 +103,15 @@ struct EditorView: View {
         .padding(.leading, 8 + tabBarLeadingPadding) // 8px base + dynamic padding for traffic lights
         .padding(.trailing, 8)
         .background(Color(nsColor: .windowBackgroundColor))
-        .animation(.smooth(duration: 0.25), value: tabBarLeadingPadding) // Smooth animation for tab bar padding
+        .animation(nil, value: tabBarLeadingPadding) // No animation on padding to prevent bounce
     }
     
     private var sidebarToggleButton: some View {
         Button(action: {
-            // Use smooth animation that matches NavigationSplitView's sidebar animation
-            withAnimation(.smooth(duration: 0.25)) {
+            // Use completely linear animation to eliminate all bounce
+            var transaction = Transaction(animation: .linear(duration: 0.35))
+            transaction.disablesAnimations = false
+            withTransaction(transaction) {
                 if columnVisibility == .all {
                     columnVisibility = .detailOnly
                 } else {

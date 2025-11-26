@@ -121,6 +121,12 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 400, ideal: 800)
         }
         .navigationSplitViewStyle(.balanced)
+        .transaction { transaction in
+            // Override NavigationSplitView's default animation to use linear (no bounce)
+            if transaction.animation != nil {
+                transaction.animation = .linear(duration: 0.35)
+            }
+        }
         .preferredColorScheme(appearanceMode.effectiveColorScheme())
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
