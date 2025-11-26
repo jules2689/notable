@@ -39,17 +39,20 @@ struct EditorView: View {
     
     private var tabBar: some View {
         HStack(spacing: 0) {
-            // Tabs (only takes space needed)
-            HStack(spacing: 1) {
-                ForEach(openTabs) { tab in
-                    tabItem(tab)
+            // Tabs - scrollable if needed (takes priority for space)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 1) {
+                    ForEach(openTabs) { tab in
+                        tabItem(tab)
+                    }
                 }
+                .padding(.leading, 8)
             }
-            .padding(.leading, 8)
+            .layoutPriority(1)
             
-            // Empty space = window drag area
+            // Empty space = window drag area (fills remaining space)
             WindowDragView()
-                .frame(maxWidth: .infinity)
+                .frame(minWidth: 0, maxWidth: .infinity)
             
             // New tab button
             Button(action: onNewTab) {
@@ -59,10 +62,11 @@ struct EditorView: View {
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
+            .layoutPriority(2)
             .buttonStyle(.plain)
             .padding(.trailing, 8)
         }
-        .frame(height: 36)
+        .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .background(Color(nsColor: .windowBackgroundColor))
     }
     
