@@ -72,10 +72,8 @@ struct ContentView: View {
                 onCloseTab: closeTab,
                 onNewTab: createNewTab
             )
-            .toolbar(.hidden, for: .windowToolbar)
             .navigationSplitViewColumnWidth(min: 400, ideal: 800)
         }
-        .toolbar(.hidden, for: .windowToolbar)
         .navigationSplitViewStyle(.balanced)
         .preferredColorScheme(appearanceMode.effectiveColorScheme())
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {

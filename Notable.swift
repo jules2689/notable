@@ -90,6 +90,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if window.toolbar != nil {
                 window.toolbar = nil
             }
+            hideNewTabButton(in: window)
+        }
+    }
+    
+    private func hideNewTabButton(in window: NSWindow) {
+        guard let titlebarView = window.standardWindowButton(.closeButton)?.superview?.superview else { return }
+        findAndHideNewTabButton(in: titlebarView)
+    }
+    
+    private func findAndHideNewTabButton(in view: NSView) {
+        let className = String(describing: type(of: view))
+        if className.contains("Button") && !className.contains("_NSThemeWidget") {
+            // Check if it's positioned to the right (the + button is on the right side)
+            if let superview = view.superview, view.frame.origin.x > superview.bounds.width / 2 {
+                if view.frame.width < 40 && view.frame.height < 40 {
+                    // Hide both the button and its superview to remove the line
+                    view.isHidden = true
+                    view.superview?.isHidden = true
+                }
+            }
+        }
+        for subview in view.subviews {
+            findAndHideNewTabButton(in: subview)
         }
     }
     
