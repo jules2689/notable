@@ -102,9 +102,9 @@ class NotesViewModel: @unchecked Sendable {
             
             isLoading = false
             
-            // Wait 100ms after loading completes before marking initial load as complete
+            // Wait 50ms after loading completes before marking initial load as complete
             if !isInitialLoadComplete {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
                 isInitialLoadComplete = true
             }
         } catch {
@@ -113,7 +113,7 @@ class NotesViewModel: @unchecked Sendable {
             
             // Even on error, mark initial load as complete after delay
             if !isInitialLoadComplete {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
                 isInitialLoadComplete = true
             }
         }

@@ -209,6 +209,14 @@ struct ContentView: View {
                 }
             }
             .preferredColorScheme(appearanceMode.effectiveColorScheme())
+            .overlay {
+                // Show SwiftUI overlay immediately while AppKit overlay is being set up
+                if !viewModel.isInitialLoadComplete {
+                    LoadingScreenView()
+                        .allowsHitTesting(true)
+                        .zIndex(1000)
+                }
+            }
             .modifier(WindowLoadingOverlayModifier(viewModel: viewModel))
     }
     
@@ -476,12 +484,19 @@ struct WindowLoadingOverlayModifier: ViewModifier {
         content
             .background(WindowAccessor { window in
                 if let window = window {
-                    // Add a small delay to ensure window is fully configured
-                    DispatchQueue.main.async {
-                        setupLoadingOverlay(in: window)
-                    }
+                    // Set up overlay immediately - don't delay
+                    setupLoadingOverlay(in: window)
                 }
             })
+            .onAppear {
+                // Try multiple times to catch the window as soon as it's available
+                setupOverlayIfNeeded()
+                
+                // Also try after a tiny delay in case window isn't ready yet
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    setupOverlayIfNeeded()
+                }
+            }
             .onChange(of: viewModel.isInitialLoadComplete) { _, isComplete in
                 if isComplete {
                     // Hide and remove overlay after a brief delay
@@ -492,6 +507,7 @@ struct WindowLoadingOverlayModifier: ViewModifier {
                 } else {
                     // Show overlay if loading starts again
                     loadingView?.isHidden = false
+                    setupOverlayIfNeeded()
                 }
             }
             .onDisappear {
@@ -499,9 +515,34 @@ struct WindowLoadingOverlayModifier: ViewModifier {
             }
     }
     
+    private func setupOverlayIfNeeded() {
+        // Try main window first
+        if let window = NSApplication.shared.mainWindow {
+            setupLoadingOverlay(in: window)
+            return
+        }
+        
+        // Try key window
+        if let window = NSApplication.shared.keyWindow {
+            setupLoadingOverlay(in: window)
+            return
+        }
+        
+        // Try any window
+        if let window = NSApplication.shared.windows.first {
+            setupLoadingOverlay(in: window)
+        }
+    }
+    
     private func setupLoadingOverlay(in window: NSWindow) {
-        // Only setup if not already set up and loading is not complete
-        guard loadingView == nil, !viewModel.isInitialLoadComplete else { return }
+        // Only setup if not already set up
+        // Always set up if loading is not complete (including on initial launch)
+        guard loadingView == nil else { return }
+        
+        // If loading is already complete, don't show overlay
+        if viewModel.isInitialLoadComplete {
+            return
+        }
         
         // Create loading screen view
         let loadingScreen = LoadingScreenView()
@@ -543,10 +584,16 @@ struct WindowLoadingOverlayModifier: ViewModifier {
         // Ensure it's on top of all other views
         hostingView.layer?.zPosition = CGFloat.greatestFiniteMagnitude
         
+        // Make sure it's visible and on top
+        hostingView.isHidden = false
+        
         // Force immediate layout and display
         hostingView.needsLayout = true
         hostingView.needsDisplay = true
         targetView.needsLayout = true
+        
+        // Ensure it's brought to front
+        targetView.addSubview(hostingView, positioned: .above, relativeTo: nil)
         
         // Update frame when window resizes
         let updateFrame = { [weak hostingView, weak targetView] in
@@ -601,15 +648,27 @@ struct WindowAccessor: NSViewRepresentable {
     
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
-        DispatchQueue.main.async {
-            callback(view.window)
+        // Try immediately first
+        if let window = view.window {
+            callback(window)
+        } else {
+            // If window not available yet, try async
+            DispatchQueue.main.async {
+                callback(view.window)
+            }
         }
         return view
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            callback(nsView.window)
+        // Try immediately first
+        if let window = nsView.window {
+            callback(window)
+        } else {
+            // If window not available yet, try async
+            DispatchQueue.main.async {
+                callback(nsView.window)
+            }
         }
     }
 }
