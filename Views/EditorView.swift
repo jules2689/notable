@@ -112,8 +112,8 @@ struct EditorView: View {
                     .lineLimit(1)
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .onTapGesture {
-                        // Single click on title starts editing (if tab is already selected)
-                        if isSelected {
+                        // Single click on title starts editing (if tab is already selected and has a note)
+                        if isSelected && !tab.isEmpty {
                             startEditingTab(tab)
                         } else {
                             onSelectTab(tab)
