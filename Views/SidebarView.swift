@@ -13,6 +13,9 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            WindowDragView()
+                .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+
             // Header with search and add button
             HStack(spacing: 8) {
                 SearchBar(text: $searchText, onSearch: { query in
@@ -98,6 +101,7 @@ struct SidebarView: View {
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+        .padding(.top, -36)
     }
 }
 

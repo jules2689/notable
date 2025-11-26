@@ -25,6 +25,7 @@
 		AA0024 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0024 /* WebDAVService.swift */; };
 		AA0025 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0025 /* KeychainHelper.swift */; };
 		AA0026 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0026 /* TabBarView.swift */; };
+		AA0027 /* WindowDragView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0027 /* WindowDragView.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -49,6 +50,7 @@
 		BB0024 /* WebDAVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDAVService.swift; sourceTree = "<group>"; };
 		BB0025 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		BB0026 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
+		BB0027 /* WindowDragView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDragView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +90,7 @@
 				BB0013 /* SettingsView.swift */,
 				BB0021 /* RichTextEditor.swift */,
 				BB0026 /* TabBarView.swift */,
+				BB0027 /* WindowDragView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -238,6 +241,7 @@
 				AA0024 /* WebDAVService.swift in Sources */,
 				AA0025 /* KeychainHelper.swift in Sources */,
 				AA0026 /* TabBarView.swift in Sources */,
+				AA0027 /* WindowDragView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 
+
 // Define a focused value key for the view model
 struct NotesViewModelKey: FocusedValueKey {
     typealias Value = NotesViewModel
