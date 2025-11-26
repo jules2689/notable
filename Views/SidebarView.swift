@@ -25,32 +25,26 @@ struct SidebarView: View {
                 })
                 
                 Menu {
-                    Button {
+                    Button("New Note", systemImage: "doc.badge.plus") {
                         Task {
                             await viewModel.createNote(title: "Untitled")
                         }
-                    } label: {
-                        Label("New Note", systemImage: "doc.badge.plus")
                     }
 
-                    Button {
+                    Button("New Folder", systemImage: "folder.badge.plus") {
                         Task {
                             await viewModel.createFolder(name: "New Folder")
                         }
-                    } label: {
-                        Label("New Folder", systemImage: "folder.badge.plus")
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
-                        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
-                        .cornerRadius(6)
+                        .contentShape(Rectangle())
                 }
-                .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .fixedSize()
+                .buttonStyle(.plain)
                 .quickTooltip("Create new note or folder")
             }
             .padding(.horizontal, 8)

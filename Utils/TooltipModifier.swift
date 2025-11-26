@@ -84,7 +84,6 @@ class TooltipNSView: NSView {
     
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        print("🖱️ Tooltip: Mouse entered, bounds: \(bounds)")
         
         // Cancel any existing timer
         tooltipTimer?.invalidate()
@@ -92,11 +91,7 @@ class TooltipNSView: NSView {
         // Schedule tooltip to show after the specified delay
         tooltipTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in
-                guard let self = self else { 
-                    print("⚠️ Tooltip: Self is nil in timer")
-                    return 
-                }
-                print("⏰ Tooltip: Timer fired, showing tooltip")
+                guard let self = self else { return }
                 self.showTooltip()
             }
         }
@@ -104,7 +99,6 @@ class TooltipNSView: NSView {
     
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        print("🖱️ Tooltip: Mouse exited")
         
         // Cancel tooltip
         tooltipTimer?.invalidate()
@@ -113,10 +107,7 @@ class TooltipNSView: NSView {
     }
     
     private func showTooltip() {
-        guard let window = self.window else { 
-            print("⚠️ Tooltip: No window available")
-            return 
-        }
+        guard let window = self.window else { return }
         
         // Create tooltip view
         let tooltipView = NSTextField(labelWithString: tooltipText)
@@ -232,13 +223,8 @@ class TooltipNSView: NSView {
         }
         
         tooltipWindow.setFrameOrigin(screenPoint)
-        
-        print("📍 Tooltip position - mouse: \(mouseLocation), mouse screen: \(mouseScreenPoint), final screen: \(screenPoint), container size: \(containerSize)")
-        
         tooltipWindow.orderFront(nil)
         self.tooltipWindow = tooltipWindow
-        
-        print("✅ Tooltip shown at: \(screenPoint)")
     }
     
     private func hideTooltip() {

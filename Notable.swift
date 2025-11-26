@@ -41,19 +41,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 object: nil
             )
             
-            // Also observe when windows appear or update
+            // Observe window updates to hide native tab button
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(windowDidUpdate(_:)),
                 name: NSWindow.didUpdateNotification,
-                object: nil
-            )
-            
-            // Observe menu updates to remove help search if it reappears
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(menuDidChange(_:)),
-                name: NSMenu.didChangeItemNotification,
                 object: nil
             )
             
@@ -95,16 +87,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func windowDidBecomeMain(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
             configureWindow(window)
+            hideNewTabButton(in: window)
         }
     }
     
     @objc func windowDidUpdate(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
-            // Re-apply window configuration to ensure titlebar stays hidden
-            configureWindow(window)
-            if window.toolbar != nil {
-                window.toolbar = nil
-            }
+            // Only hide the native tab button - don't reconfigure the window
+            // as that was causing menu rendering issues
             hideNewTabButton(in: window)
         }
     }
@@ -176,10 +166,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    @objc func menuDidChange(_ notification: Notification) {
-        // Re-remove help search field if it reappears
-        removeHelpSearchField()
-    }
 }
 
 @main
@@ -192,9 +178,6 @@ struct Notable: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
-            // Remove "Show Tab Bar" menu item  
-            CommandGroup(replacing: .toolbar) { }
-            
             CommandGroup(replacing: .newItem) {
                 NewNoteButton()
             }
@@ -224,7 +207,7 @@ struct Notable: App {
                 KeyboardShortcutsButton()
                 Divider()
                 Button("Report a Bug") {
-                    if let url = URL(string: "https://github.com/jules2689/notable/issues") {
+                    if let url = URL(string: "https://github.com/jules2689/notable/issues/new") {
                         NSWorkspace.shared.open(url)
                     }
                 }
