@@ -72,7 +72,8 @@ struct EditorView: View {
             // Sidebar toggle button
             sidebarToggleButton
                 .layoutPriority(3)
-                .padding(.leading, 8) // Fixed 8px padding from tab bar edge
+                .padding(.leading, 4) // Fixed 8px padding from tab bar edge
+                .padding(.trailing, 8) // Proper spacing
             
             // Tabs - scrollable if needed (takes priority for space)
             ScrollView(.horizontal, showsIndicators: false) {

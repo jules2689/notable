@@ -115,20 +115,126 @@ struct SidebarFooter: View {
     let onSave: () -> Void
     
     private var wordCount: Int {
-        let words = content.components(separatedBy: .whitespacesAndNewlines)
+        let plaintext = markdownToPlaintext(content)
+        let words = plaintext.components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
         return words.count
+    }
+    
+    /// Converts markdown to plaintext by stripping all markdown syntax
+    private func markdownToPlaintext(_ markdown: String) -> String {
+        var text = markdown
+        
+        // Helper function for multiline regex replacements
+        func replaceMultiline(pattern: String, with replacement: String, in text: String) -> String {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else {
+                return text
+            }
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: replacement)
+        }
+        
+        // Remove code blocks (```code```)
+        text = text.replacingOccurrences(
+            of: #"```[\s\S]*?```"#,
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Remove inline code (`code`)
+        text = text.replacingOccurrences(
+            of: #"`([^`]+)`"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove images ![alt](url)
+        text = text.replacingOccurrences(
+            of: #"!\[([^\]]*)\]\([^\)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove links [text](url) but keep the text
+        text = text.replacingOccurrences(
+            of: #"\[([^\]]+)\]\([^\)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove reference-style links [text][ref]
+        text = text.replacingOccurrences(
+            of: #"\[([^\]]+)\]\[[^\]]+\]"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove headers (# ## ### etc.)
+        text = replaceMultiline(pattern: #"^#{1,6}\s+(.+)$"#, with: "$1", in: text)
+        
+        // Remove bold/italic markers (**text**, *text*, __text__, _text_)
+        text = text.replacingOccurrences(
+            of: #"\*\*([^*]+)\*\*"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"__([^_]+)__"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"(?<!\*)\*([^*]+)\*(?!\*)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"(?<!_)_([^_]+)_(?!_)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove strikethrough (~~text~~)
+        text = text.replacingOccurrences(
+            of: #"~~([^~]+)~~"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        
+        // Remove blockquote markers (>)
+        text = replaceMultiline(pattern: #"^>\s+(.+)$"#, with: "$1", in: text)
+        
+        // Remove horizontal rules (---, ***, ___)
+        text = replaceMultiline(pattern: #"^[-*_]{3,}\s*$"#, with: "", in: text)
+        
+        // Remove list markers (-, *, +) and task list markers (- [ ], - [x])
+        text = replaceMultiline(pattern: #"^[\s]*[-*+]\s+(\[[\sx]\]\s*)?"#, with: "", in: text)
+        
+        // Remove numbered list markers (1. 2. etc.)
+        text = replaceMultiline(pattern: #"^[\s]*\d+\.\s+"#, with: "", in: text)
+        
+        // Remove HTML tags if any
+        text = text.replacingOccurrences(
+            of: #"<[^>]+>"#,
+            with: "",
+            options: .regularExpression
+        )
+        
+        // Clean up multiple spaces and normalize whitespace
+        text = text.replacingOccurrences(
+            of: #"\s+"#,
+            with: " ",
+            options: .regularExpression
+        )
+        
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private var estimatedReadTime: String {
         // Average reading speed is about 200-250 words per minute
         let wordsPerMinute = 200
         let minutes = max(1, wordCount / wordsPerMinute)
-        if minutes == 1 {
-            return "1 min read"
-        } else {
-            return "\(minutes) min read"
-        }
+        return "\(minutes) min read"
     }
     
     var body: some View {
