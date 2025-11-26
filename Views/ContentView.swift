@@ -1,6 +1,36 @@
 import SwiftUI
 import AppKit
 
+// Extension to make NavigationSplitViewVisibility storable
+extension NavigationSplitViewVisibility: RawRepresentable {
+    public var rawValue: String {
+        switch self {
+        case .automatic: return "automatic"
+        case .doubleColumn: return "doubleColumn"
+        case .all: return "all"
+        case .detailOnly: return "detailOnly"
+        default: return "all"
+        }
+    }
+    
+    public init?(rawValue: String) {
+        switch rawValue {
+        case "automatic": self = .automatic
+        case "doubleColumn": self = .doubleColumn
+        case "all": self = .all
+        case "detailOnly": self = .detailOnly
+        default: self = .all
+        }
+    }
+}
+
+// PreferenceKey to track sidebar width
+struct SidebarWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 250
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
 
 // Define a focused value key for the view model
 struct NotesViewModelKey: FocusedValueKey {
@@ -37,7 +67,8 @@ extension FocusedValues {
 struct ContentView: View {
     @State private var viewModel = NotesViewModel()
     @State private var searchText = ""
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @AppStorage("sidebarVisibility") private var columnVisibility: NavigationSplitViewVisibility = .all
+    @AppStorage("sidebarWidth") private var sidebarWidth: Double = 250
     @State private var showingSettings = false
     @State private var editedContent = ""
     @State private var isSaved = true
@@ -58,7 +89,18 @@ struct ContentView: View {
                 isSaved: $isSaved,
                 onSave: { saveAction?() }
             )
-            .navigationSplitViewColumnWidth(min: 100, ideal: 250, max: 400)
+            .navigationSplitViewColumnWidth(min: 100, ideal: sidebarWidth, max: 400)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(key: SidebarWidthKey.self, value: geometry.size.width)
+                }
+            )
+            .onPreferenceChange(SidebarWidthKey.self) { width in
+                // Persist the actual sidebar width when it changes
+                if width > 0 && columnVisibility == .all {
+                    sidebarWidth = width
+                }
+            }
         } detail: {
             EditorView(
                 viewModel: viewModel,
