@@ -8,6 +8,7 @@ struct TabItem: Identifiable, Equatable, Codable {
     var title: String
     var fileURL: URL?
     var isFileMissing: Bool = false // True if the note file was not found on disk
+    var icon: String? // Emoji string or custom icon filename
     
     /// Whether this is an empty tab with no note
     var isEmpty: Bool {
@@ -16,12 +17,12 @@ struct TabItem: Identifiable, Equatable, Codable {
     
     /// Create an empty tab
     static func empty() -> TabItem {
-        TabItem(id: UUID(), noteID: nil, title: "New Tab", fileURL: nil, isFileMissing: false)
+        TabItem(id: UUID(), noteID: nil, title: "New Tab", fileURL: nil, isFileMissing: false, icon: nil)
     }
     
     /// Create a tab for a note
     static func forNote(_ note: Note) -> TabItem {
-        TabItem(id: UUID(), noteID: note.id, title: note.title, fileURL: note.fileURL, isFileMissing: false)
+        TabItem(id: UUID(), noteID: note.id, title: note.title, fileURL: note.fileURL, isFileMissing: false, icon: note.icon)
     }
     
     /// Create a tab for a missing note file
@@ -31,7 +32,8 @@ struct TabItem: Identifiable, Equatable, Codable {
             noteID: nil,
             title: "\(filename) was not found on disk",
             fileURL: fileURL,
-            isFileMissing: true
+            isFileMissing: true,
+            icon: nil
         )
     }
     
@@ -42,14 +44,16 @@ struct TabItem: Identifiable, Equatable, Codable {
         case title
         case fileURL
         case isFileMissing
+        case icon
     }
     
-    init(id: UUID, noteID: UUID?, title: String, fileURL: URL?, isFileMissing: Bool = false) {
+    init(id: UUID, noteID: UUID?, title: String, fileURL: URL?, isFileMissing: Bool = false, icon: String? = nil) {
         self.id = id
         self.noteID = noteID
         self.title = title
         self.fileURL = fileURL
         self.isFileMissing = isFileMissing
+        self.icon = icon
     }
     
     init(from decoder: Decoder) throws {
@@ -63,6 +67,7 @@ struct TabItem: Identifiable, Equatable, Codable {
             fileURL = nil
         }
         isFileMissing = try container.decodeIfPresent(Bool.self, forKey: .isFileMissing) ?? false
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -72,6 +77,7 @@ struct TabItem: Identifiable, Equatable, Codable {
         try container.encode(title, forKey: .title)
         try container.encodeIfPresent(fileURL?.absoluteString, forKey: .fileURL)
         try container.encode(isFileMissing, forKey: .isFileMissing)
+        try container.encodeIfPresent(icon, forKey: .icon)
     }
     
     // Use default Equatable (compares all fields) so SwiftUI detects title changes

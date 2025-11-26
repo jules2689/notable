@@ -170,14 +170,18 @@ class FileSystemService: @unchecked Sendable {
         
         let data = try await webdav.downloadFile(from: path)
         
-        guard let content = String(data: data, encoding: .utf8) else { return nil }
+        guard let rawContent = String(data: data, encoding: .utf8) else { return nil }
+        
+        // Parse frontmatter
+        let (frontmatter, body) = FrontmatterParser.parse(rawContent)
         
         return Note(
             title: virtualURL.deletingPathExtension().lastPathComponent,
-            content: content,
+            content: body,
             fileURL: virtualURL,
             createdAt: Date(),
-            modifiedAt: Date()
+            modifiedAt: Date(),
+            icon: frontmatter["icon"]?.isEmpty == false ? frontmatter["icon"] : nil
         )
     }
 
@@ -239,7 +243,17 @@ class FileSystemService: @unchecked Sendable {
         }
         
         ensureSecurityScopedAccess()
-        try note.content.write(to: note.fileURL, atomically: true, encoding: .utf8)
+        
+        // Build frontmatter if icon exists
+        var frontmatter: [String: String] = [:]
+        if let icon = note.icon, !icon.isEmpty {
+            frontmatter["icon"] = icon
+        }
+        
+        // Encode content with frontmatter
+        let fullContent = FrontmatterParser.encode(frontmatter: frontmatter, body: note.content)
+        
+        try fullContent.write(to: note.fileURL, atomically: true, encoding: .utf8)
 
         // Update file modification date
         try fileManager.setAttributes(
@@ -254,9 +268,18 @@ class FileSystemService: @unchecked Sendable {
             throw FileSystemError.failedToCreateNote
         }
         
+        // Build frontmatter if icon exists
+        var frontmatter: [String: String] = [:]
+        if let icon = note.icon, !icon.isEmpty {
+            frontmatter["icon"] = icon
+        }
+        
+        // Encode content with frontmatter
+        let fullContent = FrontmatterParser.encode(frontmatter: frontmatter, body: note.content)
+        
         // Convert virtual URL to WebDAV path
         let webdavPath = getWebDAVPath(from: note.fileURL)
-        let data = note.content.data(using: .utf8) ?? Data()
+        let data = fullContent.data(using: .utf8) ?? Data()
         
         try await webdav.uploadFile(data: data, to: webdavPath)
     }

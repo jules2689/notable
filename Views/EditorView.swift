@@ -24,6 +24,8 @@ struct EditorView: View {
     @FocusState private var isTabTitleFocused: Bool
     @State private var draggedTabID: UUID?
     @State private var tabBarLeadingPadding: CGFloat = 0 // Padding for traffic lights (0 when sidebar open, 70 when closed)
+    @State private var showingIconPicker = false
+    @State private var iconPickerTabID: UUID?
     
     init(viewModel: NotesViewModel, editedContent: Binding<String>, isSaved: Binding<Bool>, openTabs: Binding<[TabItem]>, selectedTabID: Binding<UUID?>, columnVisibility: Binding<NavigationSplitViewVisibility>, onSaveActionReady: ((@escaping () -> Void) -> Void)?, onSelectTab: @escaping (TabItem) -> Void, onCloseTab: @escaping (TabItem) -> Void, onNewTab: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -61,6 +63,23 @@ struct EditorView: View {
             // Do this without animation to avoid visual glitches on launch
             if tabBarLeadingPadding != (columnVisibility == .detailOnly ? 70 : 0) {
                 tabBarLeadingPadding = columnVisibility == .detailOnly ? 70 : 0
+            }
+        }
+        .sheet(isPresented: $showingIconPicker) {
+            if let tabID = iconPickerTabID,
+               let tab = openTabs.first(where: { $0.id == tabID }) {
+                IconPickerView(
+                    selectedIcon: Binding(
+                        get: { tab.icon },
+                        set: { newIcon in
+                            updateTabIcon(tabID: tabID, icon: newIcon)
+                        }
+                    ),
+                    noteFileURL: tab.fileURL,
+                    onCustomIconSelected: { _ in
+                        // Icon file has been copied, updateTabIcon will handle the rest
+                    }
+                )
             }
         }
     }
@@ -138,6 +157,41 @@ struct EditorView: View {
         let isEditing = editingTabID == tab.id
         
         return HStack(spacing: 4) {
+            // Icon display/editor
+            if isSelected && !tab.isEmpty && !isEditing {
+                // Show icon picker button when selected
+                Button(action: {
+                    iconPickerTabID = tab.id
+                    showingIconPicker = true
+                }) {
+                    if let icon = tab.icon, !icon.isEmpty {
+                        // Check if it's a custom icon (has file extension) or emoji
+                        if icon.contains(".") {
+                            // Custom icon - load from icons folder
+                            IconImageView(iconName: icon, noteFileURL: tab.fileURL, size: 20)
+                        } else {
+                            // Emoji
+                            Text(icon)
+                                .font(.system(size: 16))
+                        }
+                    } else {
+                        Image(systemName: "tag")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .quickTooltip("Change icon")
+            } else if let icon = tab.icon, !icon.isEmpty {
+                // Show icon when not selected
+                if icon.contains(".") {
+                    IconImageView(iconName: icon, noteFileURL: tab.fileURL, size: 18)
+                } else {
+                    Text(icon)
+                        .font(.system(size: 14))
+                }
+            }
+            
             if isEditing {
                 TextField("Tab name", text: $editingTabTitle)
                     .font(.system(size: 12))
@@ -230,6 +284,13 @@ struct EditorView: View {
                     }
                 }
                 Divider()
+                if !tab.isEmpty {
+                    Button("Change Icon...") {
+                        iconPickerTabID = tab.id
+                        showingIconPicker = true
+                    }
+                    Divider()
+                }
                 Button("Close Tab") {
                     onCloseTab(tab)
                 }
@@ -265,7 +326,9 @@ struct EditorView: View {
                     id: tab.id,
                     noteID: tab.noteID,
                     title: newTitle,
-                    fileURL: tab.fileURL
+                    fileURL: tab.fileURL,
+                    isFileMissing: tab.isFileMissing,
+                    icon: tab.icon
                 )
                 
                 // If this tab has a note, rename it
@@ -301,6 +364,32 @@ struct EditorView: View {
         }
         // Search in allNoteItems (complete hierarchy) instead of noteItems (filtered for sidebar)
         return searchItems(viewModel.allNoteItems)
+    }
+    
+    private func updateTabIcon(tabID: UUID?, icon: String?) {
+        guard let tabID = tabID,
+              let index = openTabs.firstIndex(where: { $0.id == tabID }) else {
+            return
+        }
+        
+        // Update tab icon
+        var updatedTab = openTabs[index]
+        updatedTab.icon = icon
+        openTabs[index] = updatedTab
+        
+        // Update note icon if tab has a note
+        if let fileURL = updatedTab.fileURL,
+           var note = findNoteByURL(fileURL) {
+            note.icon = icon
+            viewModel.currentNote = note
+            
+            // Save the note with updated icon
+            Task {
+                await viewModel.saveCurrentNote()
+            }
+        }
+        
+        iconPickerTabID = nil
     }
     
     // MARK: - Editor Content

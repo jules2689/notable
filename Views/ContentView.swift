@@ -297,7 +297,8 @@ struct ContentView: View {
                 noteID: note.id,
                 title: note.title,
                 fileURL: note.fileURL,
-                isFileMissing: false // Clear missing file flag if note was found
+                isFileMissing: false, // Clear missing file flag if note was found
+                icon: note.icon
             )
             viewModel.selectNote(note)
         } else {

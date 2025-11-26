@@ -10,6 +10,7 @@ struct Note: Identifiable, Codable, Hashable {
     var createdAt: Date
     var modifiedAt: Date
     var tags: [String]
+    var icon: String? // Emoji string or custom icon filename
 
     init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ struct Note: Identifiable, Codable, Hashable {
         fileURL: URL,
         createdAt: Date = Date(),
         modifiedAt: Date = Date(),
-        tags: [String] = []
+        tags: [String] = [],
+        icon: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -27,6 +29,7 @@ struct Note: Identifiable, Codable, Hashable {
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.tags = tags
+        self.icon = icon
     }
 
     /// Creates a Note from a file URL by reading its contents
@@ -34,7 +37,7 @@ struct Note: Identifiable, Codable, Hashable {
         guard url.pathExtension == "md" else { return nil }
 
         do {
-            let content = try String(contentsOf: url, encoding: .utf8)
+            let rawContent = try String(contentsOf: url, encoding: .utf8)
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
 
             if let id = id {
@@ -54,12 +57,16 @@ struct Note: Identifiable, Codable, Hashable {
                 }
             }
             
+            // Parse frontmatter
+            let (frontmatter, body) = FrontmatterParser.parse(rawContent)
+            
             self.fileURL = url
             self.title = url.deletingPathExtension().lastPathComponent
-            self.content = content
+            self.content = body // Store body without frontmatter
             self.createdAt = attributes[.creationDate] as? Date ?? Date()
             self.modifiedAt = attributes[.modificationDate] as? Date ?? Date()
             self.tags = []
+            self.icon = frontmatter["icon"]?.isEmpty == false ? frontmatter["icon"] : nil
         } catch {
             return nil
         }

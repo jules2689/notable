@@ -404,6 +404,8 @@ struct HierarchicalNoteItemRow: View {
     @State private var showingDeleteAlert = false
     @State private var newName = ""
     @State private var isTargeted = false
+    @State private var showingIconPicker = false
+    @State private var iconPickerNote: Note?
     
     private var isExpanded: Bool {
         if case .folder(let folder) = item {
@@ -450,9 +452,37 @@ struct HierarchicalNoteItemRow: View {
                         .frame(width: 16)
                 }
                 
-                Image(systemName: item.isFolder ? "folder.fill" : "doc.text.fill")
-                    .foregroundStyle(item.isFolder ? .blue : .secondary)
-                    .font(.system(size: 14))
+                // Show icon for notes, folder icon for folders
+                if item.isFolder {
+                    Image(systemName: "folder.fill")
+                        .foregroundStyle(.blue)
+                        .font(.system(size: 14))
+                } else if case .note(let note) = item {
+                    // Make icon clickable to change it
+                    Button(action: {
+                        iconPickerNote = note
+                        showingIconPicker = true
+                    }) {
+                        if let icon = note.icon, !icon.isEmpty {
+                            // Show custom icon or emoji
+                            if icon.contains(".") {
+                                // Custom icon - load from icons folder
+                                IconImageView(iconName: icon, noteFileURL: note.fileURL, size: 20)
+                            } else {
+                                // Emoji
+                                Text(icon)
+                                    .font(.system(size: 18))
+                            }
+                        } else {
+                            // Default note icon
+                            Image(systemName: "doc.text.fill")
+                                .foregroundStyle(.secondary)
+                                .font(.system(size: 16))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .quickTooltip("Change icon")
+                }
 
                 Text(item.name)
                     .lineLimit(1)
@@ -488,7 +518,16 @@ struct HierarchicalNoteItemRow: View {
                 return provider
             }
             .contextMenu {
-                if item.isNote {
+                if item.isNote, case .note(let note) = item {
+                    Button {
+                        iconPickerNote = note
+                        showingIconPicker = true
+                    } label: {
+                        Label("Change Icon...", systemImage: "tag")
+                    }
+                    
+                    Divider()
+                    
                     Button {
                         newName = item.name
                         showingRenameAlert = true
@@ -609,6 +648,37 @@ struct HierarchicalNoteItemRow: View {
             
             return false
         }
+        .sheet(isPresented: $showingIconPicker) {
+            if let note = iconPickerNote {
+                IconPickerView(
+                    selectedIcon: Binding(
+                        get: { note.icon },
+                        set: { newIcon in
+                            updateNoteIcon(note: note, icon: newIcon)
+                        }
+                    ),
+                    noteFileURL: note.fileURL,
+                    onCustomIconSelected: { _ in
+                        // Icon file has been copied, updateNoteIcon will handle the rest
+                    }
+                )
+            }
+        }
+    }
+    
+    private func updateNoteIcon(note: Note, icon: String?) {
+        var updatedNote = note
+        updatedNote.icon = icon
+        viewModel.currentNote = updatedNote
+        
+        // Save the note with updated icon
+        Task {
+            await viewModel.saveCurrentNote()
+            // Reload to refresh sidebar
+            await viewModel.loadNotes()
+        }
+        
+        iconPickerNote = nil
     }
     
     /// Checks if an item is a descendant of another item (to prevent circular moves)

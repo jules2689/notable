@@ -29,6 +29,10 @@
 		AA0029 /* TooltipModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0029 /* TooltipModifier.swift */; };
 		AA0030 /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0030 /* KeyboardShortcutsView.swift */; };
 		AA0031 /* HelpNoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0031 /* HelpNoteView.swift */; };
+		AA0032 /* FrontmatterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0032 /* FrontmatterParser.swift */; };
+		AA0033 /* IconPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0033 /* IconPickerView.swift */; };
+		AA0034 /* IconImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0034 /* IconImageView.swift */; };
+		AA0035 /* AnimatedIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0035 /* AnimatedIconView.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -57,6 +61,10 @@
 		BB0029 /* TooltipModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooltipModifier.swift; sourceTree = "<group>"; };
 		BB0030 /* KeyboardShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsView.swift; sourceTree = "<group>"; };
 		BB0031 /* HelpNoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpNoteView.swift; sourceTree = "<group>"; };
+		BB0032 /* FrontmatterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterParser.swift; sourceTree = "<group>"; };
+		BB0033 /* IconPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconPickerView.swift; sourceTree = "<group>"; };
+		BB0034 /* IconImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconImageView.swift; sourceTree = "<group>"; };
+		BB0035 /* AnimatedIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedIconView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +106,9 @@
 				BB0027 /* WindowDragView.swift */,
 				BB0030 /* KeyboardShortcutsView.swift */,
 				BB0031 /* HelpNoteView.swift */,
+				BB0033 /* IconPickerView.swift */,
+				BB0034 /* IconImageView.swift */,
+				BB0035 /* AnimatedIconView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -137,6 +148,7 @@
 				BB0023 /* StorageLocationManager.swift */,
 				BB0025 /* KeychainHelper.swift */,
 				BB0029 /* TooltipModifier.swift */,
+				BB0032 /* FrontmatterParser.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -254,6 +266,10 @@
 				AA0029 /* TooltipModifier.swift in Sources */,
 				AA0030 /* KeyboardShortcutsView.swift in Sources */,
 				AA0031 /* HelpNoteView.swift in Sources */,
+				AA0032 /* FrontmatterParser.swift in Sources */,
+				AA0033 /* IconPickerView.swift in Sources */,
+				AA0034 /* IconImageView.swift in Sources */,
+				AA0035 /* AnimatedIconView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
