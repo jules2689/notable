@@ -58,7 +58,7 @@ struct ContentView: View {
                 isSaved: $isSaved,
                 onSave: { saveAction?() }
             )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 400)
+            .navigationSplitViewColumnWidth(min: 100, ideal: 250, max: 400)
         } detail: {
             EditorView(
                 viewModel: viewModel,

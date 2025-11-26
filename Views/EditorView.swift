@@ -24,6 +24,21 @@ struct EditorView: View {
     @FocusState private var isTabTitleFocused: Bool
     @State private var draggedTabID: UUID?
     @State private var tabBarLeadingPadding: CGFloat = 0 // Padding for traffic lights (0 when sidebar open, 70 when closed)
+    
+    init(viewModel: NotesViewModel, editedContent: Binding<String>, isSaved: Binding<Bool>, openTabs: Binding<[TabItem]>, selectedTabID: Binding<UUID?>, columnVisibility: Binding<NavigationSplitViewVisibility>, onSaveActionReady: ((@escaping () -> Void) -> Void)?, onSelectTab: @escaping (TabItem) -> Void, onCloseTab: @escaping (TabItem) -> Void, onNewTab: @escaping () -> Void) {
+        self.viewModel = viewModel
+        self._editedContent = editedContent
+        self._isSaved = isSaved
+        self._openTabs = openTabs
+        self._selectedTabID = selectedTabID
+        self._columnVisibility = columnVisibility
+        self.onSaveActionReady = onSaveActionReady
+        self.onSelectTab = onSelectTab
+        self.onCloseTab = onCloseTab
+        self.onNewTab = onNewTab
+        // Initialize tabBarLeadingPadding based on current sidebar state
+        _tabBarLeadingPadding = State(initialValue: columnVisibility.wrappedValue == .detailOnly ? 70 : 0)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,8 +58,11 @@ struct EditorView: View {
             }
         }
         .onAppear {
-            // Set initial padding based on current sidebar state
-            tabBarLeadingPadding = columnVisibility == .detailOnly ? 70 : 0
+            // Ensure padding matches current sidebar state (in case it changed before onAppear)
+            // Do this without animation to avoid visual glitches on launch
+            if tabBarLeadingPadding != (columnVisibility == .detailOnly ? 70 : 0) {
+                tabBarLeadingPadding = columnVisibility == .detailOnly ? 70 : 0
+            }
         }
     }
     
