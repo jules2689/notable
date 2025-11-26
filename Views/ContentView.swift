@@ -104,7 +104,7 @@ struct ContentView: View {
     @State private var selectedTabID: UUID?
     @State private var isSelectingTab = false  // Prevent onChange from updating tabs during tab switch
 
-    var body: some View {
+    private var navigationSplitView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
                 viewModel: viewModel,
@@ -142,131 +142,74 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 400, ideal: 800)
         }
-        .navigationSplitViewStyle(.balanced)
-        .transaction { transaction in
-            // Override NavigationSplitView's default animation to use linear (no bounce)
-            if transaction.animation != nil {
-                transaction.animation = .linear(duration: 0.35)
-            }
-        }
-        .preferredColorScheme(appearanceMode.effectiveColorScheme())
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView()
-        }
-        .sheet(isPresented: $showingHelp) {
-            HelpNoteView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showingKeyboardShortcuts) {
-            KeyboardShortcutsView()
-        }
-        .focusedValue(\.notesViewModel, viewModel)
-        .focusedValue(\.showingSettings, $showingSettings)
-        .focusedValue(\.saveAction, saveAction)
-        .focusedValue(\.showingHelp, $showingHelp)
-        .focusedValue(\.showingKeyboardShortcuts, $showingKeyboardShortcuts)
-        .onReceive(NotificationCenter.default.publisher(for: .closeCurrentTab)) { _ in
-            closeCurrentTab()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in
-            createNewTab()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .noteSelectedFromSidebar)) { notification in
-            print("📝 Received noteSelectedFromSidebar notification")
-            if let note = notification.object as? Note {
-                print("📝 Note found: \(note.title)")
-                // Save current note before switching
-                Task {
-                    await saveCurrentNoteIfNeeded()
-                    await MainActor.run {
-                        updateCurrentTabWithNote(note)
-                    }
+    }
+    
+    var body: some View {
+        contentWithModifiers
+    }
+    
+    private var contentWithModifiers: some View {
+        contentWithSheetsAndAlerts
+            .focusedValue(\.notesViewModel, viewModel)
+            .focusedValue(\.showingSettings, $showingSettings)
+            .focusedValue(\.saveAction, saveAction)
+            .focusedValue(\.showingHelp, $showingHelp)
+            .focusedValue(\.showingKeyboardShortcuts, $showingKeyboardShortcuts)
+            .modifier(NotificationModifiers(
+                closeCurrentTab: closeCurrentTab,
+                createNewTab: createNewTab,
+                saveCurrentNoteIfNeeded: saveCurrentNoteIfNeeded,
+                updateCurrentTabWithNote: updateCurrentTabWithNote,
+                openNoteInNewTab: openNoteInNewTab,
+                moveCurrentTab: moveCurrentTab
+            ))
+            .modifier(ChangeObservers(
+                viewModel: viewModel,
+                isSelectingTab: $isSelectingTab,
+                openTabs: $openTabs,
+                selectedTabID: $selectedTabID,
+                selectedTabIDString: $selectedTabIDString,
+                openTabsData: $openTabsData,
+                updateCurrentTabWithNote: updateCurrentTabWithNote,
+                persistTabs: persistTabs,
+                restoreTabs: restoreTabs,
+                findNote: findNote
+            ))
+    }
+    
+    private var contentWithSheetsAndAlerts: some View {
+        contentWithStyle
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
                 }
-            } else {
-                print("📝 Failed to cast notification.object to Note")
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .noteOpenInNewTab)) { notification in
-            print("📝 Received noteOpenInNewTab notification (shift-click)")
-            if let note = notification.object as? Note {
-                openNoteInNewTab(note)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .moveTabLeft)) { _ in
-            moveCurrentTab(direction: -1)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .moveTabRight)) { _ in
-            moveCurrentTab(direction: 1)
-        }
-        .onChange(of: viewModel.currentNote?.id) { oldID, newID in
-            // Only update tab when selecting from sidebar, not when switching tabs
-            guard !isSelectingTab else {
-                print("📝 onChange: Skipping (isSelectingTab)")
-                return
-            }
-            print("📝 onChange currentNote: old=\(String(describing: oldID)), new=\(String(describing: newID))")
-            if let note = viewModel.currentNote {
-                print("📝 onChange: Updating tab for \(note.title)")
-                updateCurrentTabWithNote(note)
-            }
-        }
-        .onChange(of: openTabs) { _, _ in
-            // Persist tabs whenever they change
-            persistTabs()
-        }
-        .onChange(of: selectedTabID) { _, newID in
-            // Persist selected tab ID
-            selectedTabIDString = newID?.uuidString ?? ""
-        }
-        .onAppear {
-            // Restore tabs on app launch after notes are loaded
-            Task {
-                // Wait for notes to load
-                while viewModel.isLoading {
-                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
-                }
-                await MainActor.run {
-                    restoreTabs()
+            } message: {
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
                 }
             }
-        }
-        .onChange(of: viewModel.noteItems) { _, newItems in
-            // When notes finish loading, verify and update restored tabs
-            if !openTabs.isEmpty {
-                // Re-verify tabs against newly loaded notes
-                var updatedTabs = openTabs
-                for (index, tab) in updatedTabs.enumerated() {
-                    if tab.isFileMissing, let fileURL = tab.fileURL {
-                        // Check if the missing file now exists
-                        if findNote(by: fileURL) != nil {
-                            // File was found, update tab to normal state
-                            if let note = findNote(by: fileURL) {
-                                updatedTabs[index] = TabItem.forNote(note)
-                            }
-                        }
-                    } else if !tab.isEmpty, let fileURL = tab.fileURL {
-                        // Verify existing tabs still have valid files
-                        if findNote(by: fileURL) == nil {
-                            // File no longer exists, mark as missing
-                            let filename = fileURL.lastPathComponent
-                            updatedTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
-                        }
-                    }
-                }
-                openTabs = updatedTabs
-            } else if !openTabsData.isEmpty {
-                // Tabs haven't been restored yet, restore them now
-                restoreTabs()
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
-        }
+            .sheet(isPresented: $showingHelp) {
+                HelpNoteView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showingKeyboardShortcuts) {
+                KeyboardShortcutsView()
+            }
+    }
+    
+    private var contentWithStyle: some View {
+        navigationSplitView
+            .navigationSplitViewStyle(.balanced)
+            .transaction { transaction in
+                // Override NavigationSplitView's default animation to use linear (no bounce)
+                if transaction.animation != nil {
+                    transaction.animation = .linear(duration: 0.35)
+                }
+            }
+            .preferredColorScheme(appearanceMode.effectiveColorScheme())
+            .modifier(WindowLoadingOverlayModifier(viewModel: viewModel))
     }
     
     // MARK: - Tab Management
@@ -518,6 +461,311 @@ struct ContentView: View {
             viewModel.currentNote = nil
             viewModel.selectedNoteItem = nil
         }
+    }
+}
+
+// MARK: - Loading Screen
+
+struct WindowLoadingOverlayModifier: ViewModifier {
+    let viewModel: NotesViewModel
+    @State private var loadingView: NSHostingView<LoadingScreenView>?
+    @State private var resizeObserver: NSObjectProtocol?
+    @State private var moveObserver: NSObjectProtocol?
+    
+    func body(content: Content) -> some View {
+        content
+            .background(WindowAccessor { window in
+                if let window = window {
+                    // Add a small delay to ensure window is fully configured
+                    DispatchQueue.main.async {
+                        setupLoadingOverlay(in: window)
+                    }
+                }
+            })
+            .onChange(of: viewModel.isInitialLoadComplete) { _, isComplete in
+                if isComplete {
+                    // Hide and remove overlay after a brief delay
+                    loadingView?.isHidden = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        cleanup()
+                    }
+                } else {
+                    // Show overlay if loading starts again
+                    loadingView?.isHidden = false
+                }
+            }
+            .onDisappear {
+                cleanup()
+            }
+    }
+    
+    private func setupLoadingOverlay(in window: NSWindow) {
+        // Only setup if not already set up and loading is not complete
+        guard loadingView == nil, !viewModel.isInitialLoadComplete else { return }
+        
+        // Create loading screen view
+        let loadingScreen = LoadingScreenView()
+        let hostingView = NSHostingView(rootView: loadingScreen)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        
+        // Try to add to contentView's superview first (to cover title bar buttons)
+        // Otherwise fall back to contentView
+        var targetView: NSView?
+        if let contentView = window.contentView, let superview = contentView.superview {
+            targetView = superview
+        } else if let contentView = window.contentView {
+            targetView = contentView
+        }
+        
+        guard let targetView = targetView else { return }
+        
+        // Calculate frame to cover entire window
+        // The targetView's bounds should already cover the entire window including title bar
+        // For superview: it covers the entire window frame
+        // For contentView: with fullSizeContentView, it extends into title bar area
+        // Ensure we start at origin and cover full size
+        let overlayFrame = NSRect(
+            x: 0,
+            y: 0,
+            width: targetView.bounds.width,
+            height: targetView.bounds.height
+        )
+        
+        // Set frame to cover entire area
+        hostingView.frame = overlayFrame
+        hostingView.autoresizingMask = [.width, .height]
+        
+        // Add as the topmost subview to cover everything
+        targetView.addSubview(hostingView, positioned: .above, relativeTo: nil)
+        loadingView = hostingView
+        
+        // Ensure it's on top of all other views
+        hostingView.layer?.zPosition = CGFloat.greatestFiniteMagnitude
+        
+        // Force immediate layout and display
+        hostingView.needsLayout = true
+        hostingView.needsDisplay = true
+        targetView.needsLayout = true
+        
+        // Update frame when window resizes
+        let updateFrame = { [weak hostingView, weak targetView] in
+            guard let hostingView = hostingView, let targetView = targetView else { return }
+            // Always use targetView's bounds, ensuring we start at origin
+            let overlayFrame = NSRect(
+                x: 0,
+                y: 0,
+                width: targetView.bounds.width,
+                height: targetView.bounds.height
+            )
+            hostingView.frame = overlayFrame
+            hostingView.needsLayout = true
+            // Ensure it stays on top
+            targetView.addSubview(hostingView, positioned: .above, relativeTo: nil)
+        }
+        
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: window,
+            queue: .main
+        ) { _ in
+            updateFrame()
+        }
+        
+        // Also update on move
+        moveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification,
+            object: window,
+            queue: .main
+        ) { _ in
+            updateFrame()
+        }
+    }
+    
+    private func cleanup() {
+        if let observer = resizeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            resizeObserver = nil
+        }
+        if let observer = moveObserver {
+            NotificationCenter.default.removeObserver(observer)
+            moveObserver = nil
+        }
+        loadingView?.removeFromSuperview()
+        loadingView = nil
+    }
+}
+
+struct WindowAccessor: NSViewRepresentable {
+    var callback: (NSWindow?) -> Void
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            callback(view.window)
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            callback(nsView.window)
+        }
+    }
+}
+
+// MARK: - View Modifiers
+
+struct NotificationModifiers: ViewModifier {
+    let closeCurrentTab: () -> Void
+    let createNewTab: () -> Void
+    let saveCurrentNoteIfNeeded: () async -> Void
+    let updateCurrentTabWithNote: (Note) -> Void
+    let openNoteInNewTab: (Note) -> Void
+    let moveCurrentTab: (Int) -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .closeCurrentTab)) { _ in
+                closeCurrentTab()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in
+                createNewTab()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .noteSelectedFromSidebar)) { notification in
+                print("📝 Received noteSelectedFromSidebar notification")
+                if let note = notification.object as? Note {
+                    print("📝 Note found: \(note.title)")
+                    // Save current note before switching
+                    Task {
+                        await saveCurrentNoteIfNeeded()
+                        await MainActor.run {
+                            updateCurrentTabWithNote(note)
+                        }
+                    }
+                } else {
+                    print("📝 Failed to cast notification.object to Note")
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .noteOpenInNewTab)) { notification in
+                print("📝 Received noteOpenInNewTab notification (shift-click)")
+                if let note = notification.object as? Note {
+                    openNoteInNewTab(note)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .moveTabLeft)) { _ in
+                moveCurrentTab(-1)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .moveTabRight)) { _ in
+                moveCurrentTab(1)
+            }
+    }
+}
+
+struct ChangeObservers: ViewModifier {
+    let viewModel: NotesViewModel
+    @Binding var isSelectingTab: Bool
+    @Binding var openTabs: [TabItem]
+    @Binding var selectedTabID: UUID?
+    @Binding var selectedTabIDString: String
+    @Binding var openTabsData: Data
+    
+    let updateCurrentTabWithNote: (Note) -> Void
+    let persistTabs: () -> Void
+    let restoreTabs: () -> Void
+    let findNote: (URL) -> Note?
+    
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: viewModel.currentNote?.id) { oldID, newID in
+                // Only update tab when selecting from sidebar, not when switching tabs
+                guard !isSelectingTab else {
+                    print("📝 onChange: Skipping (isSelectingTab)")
+                    return
+                }
+                print("📝 onChange currentNote: old=\(String(describing: oldID)), new=\(String(describing: newID))")
+                if let note = viewModel.currentNote {
+                    print("📝 onChange: Updating tab for \(note.title)")
+                    updateCurrentTabWithNote(note)
+                }
+            }
+            .onChange(of: openTabs) { _, _ in
+                // Persist tabs whenever they change
+                persistTabs()
+            }
+            .onChange(of: selectedTabID) { _, newID in
+                // Persist selected tab ID
+                selectedTabIDString = newID?.uuidString ?? ""
+            }
+            .onAppear {
+                // Restore tabs on app launch after notes are loaded
+                Task {
+                    // Wait for notes to load
+                    while viewModel.isLoading {
+                        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                    }
+                    await MainActor.run {
+                        restoreTabs()
+                    }
+                }
+            }
+            .onChange(of: viewModel.noteItems) { _, newItems in
+                // When notes finish loading, verify and update restored tabs
+                if !openTabs.isEmpty {
+                    // Re-verify tabs against newly loaded notes
+                    var updatedTabs = openTabs
+                    for (index, tab) in updatedTabs.enumerated() {
+                        if tab.isFileMissing, let fileURL = tab.fileURL {
+                            // Check if the missing file now exists
+                            if findNote(fileURL) != nil {
+                                // File was found, update tab to normal state
+                                if let note = findNote(fileURL) {
+                                    updatedTabs[index] = TabItem.forNote(note)
+                                }
+                            }
+                        } else if !tab.isEmpty, let fileURL = tab.fileURL {
+                            // Verify existing tabs still have valid files
+                            if findNote(fileURL) == nil {
+                                // File no longer exists, mark as missing
+                                let filename = fileURL.lastPathComponent
+                                updatedTabs[index] = TabItem.forMissingFile(filename: filename, fileURL: fileURL)
+                            }
+                        }
+                    }
+                    openTabs = updatedTabs
+                } else if !openTabsData.isEmpty {
+                    // Tabs haven't been restored yet, restore them now
+                    restoreTabs()
+                }
+            }
+    }
+}
+
+struct LoadingScreenView: View {
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Background that covers everything including title bar
+                Color(nsColor: .windowBackgroundColor)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .ignoresSafeArea(.all)
+                
+                // Loading indicator
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .progressViewStyle(.circular)
+                    
+                    Text("Loading notes...")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(.all)
+        .allowsHitTesting(true) // Block all interactions
+        .transition(.opacity)
     }
 }
 

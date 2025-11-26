@@ -11,6 +11,7 @@ class NotesViewModel: @unchecked Sendable {
     var selectedNoteItem: NoteItem?
     var currentNote: Note?
     var isLoading = false
+    var isInitialLoadComplete = false
     var errorMessage: String?
 
     nonisolated(unsafe) private var storageLocationObserver: NSObjectProtocol?
@@ -100,9 +101,21 @@ class NotesViewModel: @unchecked Sendable {
             }
             
             isLoading = false
+            
+            // Wait 100ms after loading completes before marking initial load as complete
+            if !isInitialLoadComplete {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                isInitialLoadComplete = true
+            }
         } catch {
             errorMessage = "Failed to load notes: \(error.localizedDescription)"
             isLoading = false
+            
+            // Even on error, mark initial load as complete after delay
+            if !isInitialLoadComplete {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                isInitialLoadComplete = true
+            }
         }
     }
     
