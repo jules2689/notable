@@ -23,7 +23,7 @@ struct EditorView: View {
     @State private var editingTabTitle: String = ""
     @FocusState private var isTabTitleFocused: Bool
     @State private var draggedTabID: UUID?
-    @State var tabBarLeading: CGFloat = 0
+    @State private var tabBarLeadingPadding: CGFloat = 0 // Padding for traffic lights (0 when sidebar open, 70 when closed)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +36,16 @@ struct EditorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all, edges: .top)
         .background(Color(nsColor: .textBackgroundColor))
+        .onChange(of: columnVisibility) { _, newValue in
+            // Sync tab bar padding when sidebar is dragged closed/open (not just toggled)
+            withAnimation(.smooth(duration: 0.25)) {
+                tabBarLeadingPadding = newValue == .detailOnly ? 70 : 0
+            }
+        }
+        .onAppear {
+            // Set initial padding based on current sidebar state
+            tabBarLeadingPadding = columnVisibility == .detailOnly ? 70 : 0
+        }
     }
     
     // MARK: - Tab Bar
@@ -45,8 +55,7 @@ struct EditorView: View {
             // Sidebar toggle button
             sidebarToggleButton
                 .layoutPriority(3)
-                .padding(.leading, tabBarLeading)
-                .animation(.easeInOut(duration: 1.5), value: tabBarLeading)
+                .padding(.leading, 8) // Fixed 8px padding from tab bar edge
             
             // Tabs - scrollable if needed (takes priority for space)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -74,22 +83,22 @@ struct EditorView: View {
             .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
-        .padding(.leading, 8)
+        .padding(.leading, 8 + tabBarLeadingPadding) // 8px base + dynamic padding for traffic lights
         .padding(.trailing, 8)
-        .animation(.easeInOut(duration: 1.5), value: tabBarLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+        .animation(.smooth(duration: 0.25), value: tabBarLeadingPadding) // Smooth animation for tab bar padding
     }
     
     private var sidebarToggleButton: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
+            // Use smooth animation that matches NavigationSplitView's sidebar animation
+            withAnimation(.smooth(duration: 0.25)) {
                 if columnVisibility == .all {
                     columnVisibility = .detailOnly
-                    tabBarLeading = 86
                 } else {
                     columnVisibility = .all
-                    tabBarLeading = 8
                 }
+                // tabBarLeadingPadding will be updated by onChange handler
             }
         }) {
             Image(systemName: "sidebar.left")
