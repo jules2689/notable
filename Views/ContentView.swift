@@ -66,6 +66,7 @@ struct ContentView: View {
                 isSaved: $isSaved,
                 openTabs: $openTabs,
                 selectedTabID: $selectedTabID,
+                columnVisibility: $columnVisibility,
                 onSaveActionReady: { action in
                     saveAction = action
                 },

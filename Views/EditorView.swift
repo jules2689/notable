@@ -8,6 +8,8 @@ struct EditorView: View {
     @Binding var isSaved: Bool
     @Binding var openTabs: [TabItem]
     @Binding var selectedTabID: UUID?
+    @Binding var columnVisibility: NavigationSplitViewVisibility
+
     var onSaveActionReady: ((@escaping () -> Void) -> Void)?
     var onSelectTab: (TabItem) -> Void
     var onCloseTab: (TabItem) -> Void
@@ -21,6 +23,7 @@ struct EditorView: View {
     @State private var editingTabTitle: String = ""
     @FocusState private var isTabTitleFocused: Bool
     @State private var draggedTabID: UUID?
+    @State var tabBarLeading: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +42,12 @@ struct EditorView: View {
     
     private var tabBar: some View {
         HStack(spacing: 0) {
+            // Sidebar toggle button
+            sidebarToggleButton
+                .layoutPriority(3)
+                .padding(.leading, tabBarLeading)
+                .animation(.easeInOut(duration: 1.5), value: tabBarLeading)
+            
             // Tabs - scrollable if needed (takes priority for space)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 1) {
@@ -46,7 +55,6 @@ struct EditorView: View {
                         tabItem(tab)
                     }
                 }
-                .padding(.leading, 8)
             }
             .layoutPriority(1)
             
@@ -64,10 +72,33 @@ struct EditorView: View {
             }
             .layoutPriority(2)
             .buttonStyle(.plain)
-            .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+        .padding(.leading, 8)
+        .padding(.trailing, 8)
+        .animation(.easeInOut(duration: 1.5), value: tabBarLeading)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+    
+    private var sidebarToggleButton: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
+                if columnVisibility == .all {
+                    columnVisibility = .detailOnly
+                    tabBarLeading = 86
+                } else {
+                    columnVisibility = .all
+                    tabBarLeading = 8
+                }
+            }
+        }) {
+            Image(systemName: "sidebar.left")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
     
     private func tabItem(_ tab: TabItem) -> some View {
@@ -366,6 +397,7 @@ struct TabDropDelegate: DropDelegate {
         isSaved: .constant(true),
         openTabs: .constant([]),
         selectedTabID: .constant(nil),
+        columnVisibility: .constant(.all),
         onSaveActionReady: nil,
         onSelectTab: { _ in },
         onCloseTab: { _ in },

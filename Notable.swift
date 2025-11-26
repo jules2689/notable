@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 object: nil
             )
             
-            // Also observe when windows appear
+            // Also observe when windows appear or update
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(windowDidUpdate(_:)),
@@ -87,6 +87,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func windowDidUpdate(_ notification: Notification) {
         if let window = notification.object as? NSWindow {
+            // Re-apply window configuration to ensure titlebar stays hidden
+            configureWindow(window)
             if window.toolbar != nil {
                 window.toolbar = nil
             }
