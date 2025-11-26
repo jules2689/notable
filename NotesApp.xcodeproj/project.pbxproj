@@ -24,6 +24,7 @@
 		AA0023 /* StorageLocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0023 /* StorageLocationManager.swift */; };
 		AA0024 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0024 /* WebDAVService.swift */; };
 		AA0025 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0025 /* KeychainHelper.swift */; };
+		AA0026 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0026 /* TabBarView.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
 /* End PBXBuildFile section */
 
@@ -47,6 +48,7 @@
 		BB0023 /* StorageLocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageLocationManager.swift; sourceTree = "<group>"; };
 		BB0024 /* WebDAVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDAVService.swift; sourceTree = "<group>"; };
 		BB0025 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		BB0026 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +87,7 @@
 				BB0012 /* EditorView.swift */,
 				BB0013 /* SettingsView.swift */,
 				BB0021 /* RichTextEditor.swift */,
+				BB0026 /* TabBarView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -234,6 +237,7 @@
 				AA0023 /* StorageLocationManager.swift in Sources */,
 				AA0024 /* WebDAVService.swift in Sources */,
 				AA0025 /* KeychainHelper.swift in Sources */,
+				AA0026 /* TabBarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

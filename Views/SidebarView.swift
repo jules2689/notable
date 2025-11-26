@@ -408,7 +408,11 @@ struct HierarchicalNoteItemRow: View {
         .onTapGesture {
             switch item {
             case .note(let note):
+                print("📝 SidebarView: Selecting note \(note.title)")
                 viewModel.selectNote(note)
+                // Notify ContentView that a note was selected
+                print("📝 SidebarView: Posting notification for \(note.title)")
+                NotificationCenter.default.post(name: .noteSelectedFromSidebar, object: note)
             case .folder(let folder):
                 // Toggle expansion when clicking on folder
                 viewModel.toggleFolderExpansion(folder)

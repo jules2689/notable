@@ -1,24 +1,69 @@
 import SwiftUI
 import AppKit
 
-// App delegate to configure window tabbing and appearance
+// Notification for tab actions
+extension Notification.Name {
+    static let closeCurrentTab = Notification.Name("closeCurrentTab")
+    static let newTab = Notification.Name("newTab")
+    static let noteSelectedFromSidebar = Notification.Name("noteSelectedFromSidebar")
+}
+
+// App delegate to configure window appearance (using custom tabs instead of native)
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Enable automatic window tabbing globally
-        NSWindow.allowsAutomaticWindowTabbing = true
-        
-        // Configure all windows to have transparent title bar
-        for window in NSApp.windows {
-            configureWindow(window)
+    var eventMonitor: Any?
+    
+    nonisolated func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in
+            // Completely disable automatic window tabbing
+            NSWindow.allowsAutomaticWindowTabbing = false
+            
+            // Configure all windows with delay to ensure SwiftUI has set them up
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                for window in NSApp.windows {
+                    self.configureWindow(window)
+                }
+            }
+            
+            // Observe new windows being created
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidBecomeMain(_:)),
+                name: NSWindow.didBecomeMainNotification,
+                object: nil
+            )
+            
+            // Also observe when windows appear
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidUpdate(_:)),
+                name: NSWindow.didUpdateNotification,
+                object: nil
+            )
+            
+            // Intercept CMD-W and CMD-T to handle tabs
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                if event.modifierFlags.contains(.command) {
+                    if event.charactersIgnoringModifiers == "w" {
+                        NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
+                        return nil
+                    }
+                    if event.charactersIgnoringModifiers == "t" {
+                        NotificationCenter.default.post(name: .newTab, object: nil)
+                        return nil
+                    }
+                }
+                return event
+            }
         }
-        
-        // Observe new windows being created
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidBecomeMain(_:)),
-            name: NSWindow.didBecomeMainNotification,
-            object: nil
-        )
+    }
+    
+    nonisolated func applicationWillTerminate(_ notification: Notification) {
+        Task { @MainActor in
+            if let monitor = eventMonitor {
+                NSEvent.removeMonitor(monitor)
+            }
+        }
     }
     
     @objc func windowDidBecomeMain(_ notification: Notification) {
@@ -27,17 +72,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    @objc func windowDidUpdate(_ notification: Notification) {
+        if let window = notification.object as? NSWindow {
+            if window.toolbar != nil {
+                window.toolbar = nil
+            }
+        }
+    }
+    
     private func configureWindow(_ window: NSWindow) {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
+        window.tabbingMode = .disallowed
+        window.toolbar = nil
+        window.tab.title = ""
     }
 }
 
 @main
 struct Notable: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @Environment(\.openWindow) private var openWindow
     
     var body: some Scene {
         WindowGroup(id: "main") {
@@ -45,60 +101,21 @@ struct Notable: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
+            // Remove "Show Tab Bar" menu item  
+            CommandGroup(replacing: .toolbar) { }
+            
             CommandGroup(replacing: .newItem) {
                 NewNoteButton()
+            }
+            
+            CommandGroup(replacing: .saveItem) {
+                SaveButton()
             }
             
             CommandGroup(after: .appSettings) {
                 SettingsButton()
             }
-            
-            // Add New Tab to Window menu
-            CommandGroup(after: .windowArrangement) {
-                NewTabButton()
-            }
         }
-    }
-}
-
-struct NewTabButton: View {
-    @Environment(\.openWindow) private var openWindow
-    
-    var body: some View {
-        Button("New Tab") {
-            guard let currentWindow = NSApp.keyWindow else {
-                openWindow(id: "main")
-                return
-            }
-            
-            // Store reference to current window before opening new one
-            let targetWindow = currentWindow
-            let existingWindowNumbers = Set(NSApp.windows.map { $0.windowNumber })
-            
-            // Set up observer BEFORE opening the window to catch it immediately
-            var observer: NSObjectProtocol?
-            observer = NotificationCenter.default.addObserver(
-                forName: NSWindow.didBecomeKeyNotification,
-                object: nil,
-                queue: .main
-            ) { notification in
-                guard let newWindow = notification.object as? NSWindow,
-                      !existingWindowNumbers.contains(newWindow.windowNumber),
-                      newWindow != targetWindow else { return }
-                
-                // Remove observer immediately
-                if let obs = observer {
-                    NotificationCenter.default.removeObserver(obs)
-                }
-                
-                // Add the new window as a tab to the original window
-                targetWindow.addTabbedWindow(newWindow, ordered: .above)
-            }
-            
-            // Open new window
-            openWindow(id: "main")
-        }
-        .keyboardShortcut("t", modifiers: .command)
     }
 }
 
@@ -113,6 +130,18 @@ struct NewNoteButton: View {
         }
         .keyboardShortcut("n", modifiers: .command)
         .disabled(viewModel == nil)
+    }
+}
+
+struct SaveButton: View {
+    @FocusedValue(\.saveAction) private var saveAction: (() -> Void)?
+
+    var body: some View {
+        Button("Save") {
+            saveAction?()
+        }
+        .keyboardShortcut("s", modifiers: .command)
+        .disabled(saveAction == nil)
     }
 }
 
