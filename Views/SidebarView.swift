@@ -848,13 +848,14 @@ struct TapBlockingView: NSViewRepresentable {
 
 struct GitPushButton: View {
     let viewModel: NotesViewModel
+    @AppStorage("autoCommitChanges") private var autoCommitChanges: Bool = false
     @State private var isPushing = false
     @State private var pushError: String?
     @State private var isGitRepo = false
     
     var body: some View {
         Group {
-            if isGitRepo {
+            if isGitRepo && autoCommitChanges {
                 VStack(spacing: 0) {
                     Divider()
                     
@@ -924,6 +925,12 @@ struct GitPushButton: View {
         }
         .onChange(of: viewModel.currentNote) { _, _ in
             // Re-check git repo status when note changes (in case repo was initialized)
+            Task {
+                await checkGitRepo()
+            }
+        }
+        .onChange(of: autoCommitChanges) { _, _ in
+            // Re-check git repo status when auto-commit setting changes
             Task {
                 await checkGitRepo()
             }

@@ -422,17 +422,23 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(appearanceMode.effectiveColorScheme())
-        .onAppear {
+        .task {
+            // Load initial state
             storageType = storageManager.storageType
             customPath = storageManager.customPath ?? ""
             webdavServerURL = storageManager.webdavServerURL?.absoluteString ?? ""
             webdavUsername = storageManager.webdavUsername ?? ""
             // Don't load password from keychain in UI for security
             
-            // Check git repo status
-            Task {
-                await checkGitRepositoryStatus()
-            }
+            // Check git repo status and load upstream URL
+            await checkGitRepositoryStatus()
+        }
+        .onAppear {
+            // Also update state synchronously for immediate UI updates
+            storageType = storageManager.storageType
+            customPath = storageManager.customPath ?? ""
+            webdavServerURL = storageManager.webdavServerURL?.absoluteString ?? ""
+            webdavUsername = storageManager.webdavUsername ?? ""
         }
         .onChange(of: autoCommitChanges) { _, _ in
             // Re-check git status when auto-commit setting changes
@@ -542,23 +548,31 @@ struct SettingsView: View {
     
     
     private func checkGitRepositoryStatus() async {
-        isGitRepo = gitService.isGitRepository()
+        let isRepo = gitService.isGitRepository()
+        await MainActor.run {
+            isGitRepo = isRepo
+        }
         
-        if isGitRepo {
+        if isRepo {
             // Load current upstream URL
             do {
+                print("🔍 Checking for upstream URL...")
                 if let url = try await gitService.getUpstreamURL() {
+                    print("✅ Found upstream URL: \(url)")
                     await MainActor.run {
                         upstreamURL = url
                     }
                 } else {
+                    print("⚠️ No upstream URL found (remote exists but returned nil)")
                     await MainActor.run {
                         upstreamURL = ""
                     }
                 }
             } catch {
+                print("❌ Error getting upstream URL: \(error.localizedDescription)")
                 await MainActor.run {
                     upstreamURL = ""
+                    // Don't set error message here, just log it
                 }
             }
         } else {
@@ -610,6 +624,9 @@ struct SettingsView: View {
                 isSavingUpstream = false
                 gitSuccessMessage = "Upstream URL saved successfully"
             }
+            
+            // Reload the upstream URL to ensure it's correctly displayed (in case it was modified, e.g., token embedded)
+            await checkGitRepositoryStatus()
         } catch {
             await MainActor.run {
                 isSavingUpstream = false

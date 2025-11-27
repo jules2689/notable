@@ -408,12 +408,7 @@ class GitService {
         return try await MainActor.run { () -> String? in
             let repo = try self.openRepository(at: directory)
             
-            // Get the current branch
-            guard let head = try? repo.HEAD.target as? Branch else {
-                return nil
-            }
-            
-            // Try to get origin remote URL
+            // Try to get origin remote URL (don't require a branch HEAD)
             if let remote = try? repo.remote.get(named: "origin") {
                 var urlString = remote.url.absoluteString
                 
@@ -428,9 +423,11 @@ class GitService {
                     }
                 }
                 
+                print("✅ Retrieved upstream URL: \(urlString)")
                 return urlString
             }
             
+            print("⚠️ No 'origin' remote found")
             return nil
         }
     }
