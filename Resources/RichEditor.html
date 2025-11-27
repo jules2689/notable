@@ -779,9 +779,11 @@
                 // Get text content
                 const text = codeElement.textContent || '';
                 
-                // Create container
+                // Create container with fixed max height
                 const container = document.createElement('div');
                 container.className = 'monaco-editor-container';
+                container.style.maxHeight = '750px';
+                container.style.overflow = 'hidden';
                 codeElement.textContent = '';
                 codeElement.appendChild(container);
                 
@@ -819,19 +821,49 @@
                     }
                 }, 100);
                 
-                // Update height (max 750px)
-                const updateHeight = () => {
-                    container.style.height = Math.min(editor.getContentHeight(), 750) + 'px';
+                // Calculate height based on line count
+                const calculateHeight = () => {
+                    const lineCount = editor.getModel().getLineCount();
+                    const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight);
+                    const fontSize = editor.getOption(monaco.editor.EditorOption.fontSize);
+                    // Account for padding and line spacing
+                    const padding = 8; // top + bottom padding
+                    const height = (lineCount * lineHeight) + padding;
+                    return Math.min(Math.max(height, 100), 750);
+                };
+                
+                // Set initial height
+                const setInitialHeight = () => {
+                    const height = calculateHeight();
+                    container.style.height = height + 'px';
                     editor.layout();
                 };
                 
                 // Lifecycle hook 1: Content changed
+                let heightUpdatePending = false;
                 editor.onDidChangeModelContent(() => {
-                    updateHeight();
                     notifyChange();
+                    
+                    // Debounce height updates
+                    if (heightUpdatePending) return;
+                    heightUpdatePending = true;
+                    
+                    setTimeout(() => {
+                        const newHeight = calculateHeight();
+                        const currentHeight = parseInt(container.style.height) || 100;
+                        
+                        // Only update if height changed significantly (more than 5px difference)
+                        if (Math.abs(newHeight - currentHeight) > 5) {
+                            container.style.height = newHeight + 'px';
+                            editor.layout();
+                        }
+                        
+                        heightUpdatePending = false;
+                    }, 150);
                 });
                 
-                updateHeight();
+                // Initial height
+                setTimeout(setInitialHeight, 100);
                 monacoEditors.set(codeElement, editor);
                 container.addEventListener('mousedown', () => editor.focus());
                 setTimeout(() => updateCodeBlockLanguageButtons(), 50);
@@ -1581,8 +1613,18 @@
         // Parse custom components {% component args %}
         function parseCustomComponents(html) {
             // Callouts: {% callout type | message %}
-            html = html.replace(/\{%\s*callout\s+(\w+)\s*\|\s*([^%]+?)\s*%\}/g,
-                '<div class="callout $1">$2</div>');
+            // Since we use placeholders for %} and %, match everything up to the closing %}
+            const PLACEHOLDER_CLOSE = '___JINJA_CLOSE___';
+            const PLACEHOLDER_PERCENT = '___JINJA_PERCENT___';
+            
+            html = html.replace(/\{%\s*callout\s+(\w+)\s*\|\s*([\s\S]*?)\s*%\}/g,
+                (match, type, content) => {
+                    // Restore placeholders back to actual characters
+                    // First restore %} sequences, then restore % characters
+                    let unescapedContent = content.replace(new RegExp(PLACEHOLDER_CLOSE, 'g'), '%}');
+                    unescapedContent = unescapedContent.replace(new RegExp(PLACEHOLDER_PERCENT, 'g'), '%');
+                    return `<div class="callout ${type}">${unescapedContent}</div>`;
+                });
 
             // Iframes: {% iframe url %}
             html = html.replace(/\{%\s*iframe\s+([^%]+?)\s*%\}/g, (match, url) => {
@@ -1787,16 +1829,19 @@
                     ) || 'info';
                     
                     // Get the innerHTML to preserve any HTML content
-                    const calloutContent = calloutDiv.innerHTML.trim();
+                    let calloutContent = calloutDiv.innerHTML.trim();
                     
-                    // Convert HTML content to markdown for cleaner storage
-                    // Create a temporary element to convert just this callout's content
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = calloutContent;
-                    const markdownContent = turndownService.turndown(tempDiv.innerHTML);
+                    // Escape closing jinja tags (%}) that might be in the content to prevent parsing issues
+                    // Use a unique placeholder for %} to avoid conflicts
+                    // Replace %} with a placeholder, then % with another placeholder
+                    const PLACEHOLDER_CLOSE = '___JINJA_CLOSE___';
+                    const PLACEHOLDER_PERCENT = '___JINJA_PERCENT___';
+                    calloutContent = calloutContent.replace(/%\}/g, PLACEHOLDER_CLOSE);
+                    calloutContent = calloutContent.replace(/%/g, PLACEHOLDER_PERCENT);
                     
                     // Replace the callout div with jinja syntax text node
-                    const jinjaText = `{% callout ${calloutType} | ${markdownContent.trim()} %}`;
+                    // The HTML content will be inserted directly when parsed (see parseCustomComponents)
+                    const jinjaText = `{% callout ${calloutType} | ${calloutContent} %}`;
                     const textNode = document.createTextNode(jinjaText);
                     calloutDiv.replaceWith(textNode);
                 });
