@@ -50,6 +50,13 @@
             outline: none;
             min-height: 100vh;
         }
+        
+        /* Don't interfere with Monaco editor selection */
+        #editor pre .monaco-editor-container,
+        #editor pre .monaco-editor-container * {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
 
         /* Headings */
         h1 { font-size: 28px; font-weight: 700; margin: 16px 0 8px; }
@@ -113,6 +120,8 @@
             background: none;
             padding: 0;
             color: inherit;
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         /* Monaco Editor container */
@@ -120,9 +129,24 @@
             width: 100%;
             height: auto;
             min-height: 100px;
+            max-height: 750px;
             border-radius: 0;
             overflow: hidden;
             background: transparent;
+        }
+        
+        /* Enable scrolling when content exceeds max height */
+        pre .monaco-editor-container .monaco-editor {
+            max-height: 750px;
+        }
+        
+        pre .monaco-editor-container .monaco-editor .monaco-scrollable-element {
+            max-height: 750px;
+            overflow-y: auto !important;
+        }
+        
+        pre .monaco-editor-container .monaco-editor .monaco-scrollable-element > .monaco-editor-background {
+            max-height: 750px;
         }
         
         pre .monaco-editor-container .monaco-editor {
@@ -137,19 +161,10 @@
             background: transparent !important;
         }
         
-        /* Ensure text selection works in Monaco */
-        pre .monaco-editor-container .monaco-editor .view-lines,
-        pre .monaco-editor-container .monaco-editor .view-line,
-        pre .monaco-editor-container .monaco-editor .view-line span {
-            user-select: text !important;
-            -webkit-user-select: text !important;
-            -moz-user-select: text !important;
-            -ms-user-select: text !important;
-        }
-        
-        pre .monaco-editor-container .monaco-editor .inputarea {
-            user-select: text !important;
-            -webkit-user-select: text !important;
+        /* Let Monaco handle text selection naturally */
+        pre .monaco-editor-container .monaco-editor {
+            user-select: text;
+            -webkit-user-select: text;
         }
         
         pre .code-language-button {
@@ -741,126 +756,73 @@
             };
         }
         
-        // Helper function to initialize Monaco Editor for a code block
+        // Simple Monaco Editor initialization - only 2 lifecycle hooks
         async function initMonacoEditor(codeElement, language) {
             try {
                 await initMonaco();
                 
                 if (typeof monaco === 'undefined' || !monaco.editor) {
-                    console.warn('Monaco Editor not available');
                     return null;
                 }
                 
+                // If editor exists, just update language
                 if (monacoEditors.has(codeElement)) {
                     const editor = monacoEditors.get(codeElement);
                     if (language) {
                         const languageMap = getMonacoLanguageMap();
                         const monacoLanguage = languageMap[language] || language;
-                        try {
-                            monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage);
-                        } catch (e) {
-                            console.warn('Failed to update Monaco language:', e);
-                        }
+                        monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage);
                     }
                     return editor;
                 }
                 
                 // Get text content
-                let text = '';
-                if (monacoEditors.has(codeElement)) {
-                    try {
-                        const existingEditor = monacoEditors.get(codeElement);
-                        text = existingEditor.getValue();
-                    } catch (e) {
-                        text = codeElement.textContent || '';
-                    }
-                } else {
-                    text = codeElement.textContent || codeElement.innerText || '';
-                }
+                const text = codeElement.textContent || '';
                 
                 // Create container
                 const container = document.createElement('div');
                 container.className = 'monaco-editor-container';
-                container.style.height = 'auto';
-                container.style.minHeight = '100px';
-                
-                // Clear and add container
                 codeElement.textContent = '';
                 codeElement.appendChild(container);
                 
                 // Get language
                 const languageMap = getMonacoLanguageMap();
-                const monacoLanguage = languageMap[language] || '';
+                const monacoLanguage = language ? (languageMap[language] || language) : 'plaintext';
                 
                 // Get background color
                 const preElement = codeElement.closest('pre');
-                const computedStyle = window.getComputedStyle(preElement);
-                const codeBgColor = computedStyle.backgroundColor || 'transparent';
+                const codeBgColor = window.getComputedStyle(preElement).backgroundColor;
                 
-                // Create editor
+                // Create standard Monaco editor
                 const editor = monaco.editor.create(container, {
                     value: text,
                     language: monacoLanguage,
                     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs',
                     automaticLayout: true,
                     minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
                     fontSize: 14,
                     lineNumbers: 'off',
-                    glyphMargin: false,
-                    folding: false,
-                    lineDecorationsWidth: 0,
-                    lineNumbersMinChars: 0,
-                    renderLineHighlight: 'none',
-                    overviewRulerBorder: false,
-                    hideCursorInOverviewRuler: true,
-                    overviewRulerLanes: 0,
                     wordWrap: 'on',
-                    padding: { top: 0, bottom: 0 },
-                    readOnly: false,
-                    selectOnLineNumbers: true,
-                    quickSuggestions: false,
-                    suggestOnTriggerCharacters: false,
-                    acceptSuggestionOnEnter: 'off',
-                    tabCompletion: 'off',
-                    wordBasedSuggestions: false
+                    readOnly: false
                 });
                 
-                // Match background color
+                // Match background
                 setTimeout(() => {
-                    try {
-                        const editorDom = editor.getDomNode();
-                        if (editorDom) {
-                            editorDom.style.backgroundColor = codeBgColor;
-                            const editorBackground = editorDom.querySelector('.monaco-editor-background');
-                            if (editorBackground) {
-                                editorBackground.style.backgroundColor = codeBgColor;
-                            }
-                            const margin = editorDom.querySelector('.margin');
-                            if (margin) {
-                                margin.style.backgroundColor = codeBgColor;
-                            }
-                            const viewLines = editorDom.querySelector('.view-lines');
-                            if (viewLines) {
-                                viewLines.style.backgroundColor = codeBgColor;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('Failed to set Monaco background:', e);
+                    const dom = editor.getDomNode();
+                    if (dom) {
+                        dom.style.backgroundColor = codeBgColor;
+                        const bg = dom.querySelector('.monaco-editor-background');
+                        if (bg) bg.style.backgroundColor = codeBgColor;
                     }
                 }, 100);
                 
-                // Update height
+                // Update height (max 750px)
                 const updateHeight = () => {
-                    try {
-                        const contentHeight = editor.getContentHeight();
-                        container.style.height = contentHeight + 'px';
-                        editor.layout();
-                    } catch (e) {
-                        console.warn('Failed to update Monaco height:', e);
-                    }
+                    container.style.height = Math.min(editor.getContentHeight(), 750) + 'px';
+                    editor.layout();
                 };
                 
+                // Lifecycle hook 1: Content changed
                 editor.onDidChangeModelContent(() => {
                     updateHeight();
                     notifyChange();
@@ -868,26 +830,12 @@
                 
                 updateHeight();
                 monacoEditors.set(codeElement, editor);
-                
-                // Ensure language button is created after Monaco initialization
-                setTimeout(() => {
-                    updateCodeBlockLanguageButtons();
-                }, 50);
-                
-                // Theme changes
-                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                const themeHandler = (e) => {
-                    try {
-                        monaco.editor.setTheme(e.matches ? 'vs-dark' : 'vs');
-                    } catch (err) {
-                        console.warn('Failed to update Monaco theme:', err);
-                    }
-                };
-                mediaQuery.addEventListener('change', themeHandler);
+                container.addEventListener('mousedown', () => editor.focus());
+                setTimeout(() => updateCodeBlockLanguageButtons(), 50);
                 
                 return editor;
             } catch (err) {
-                console.error('Failed to initialize Monaco Editor:', err);
+                console.error('Monaco init failed:', err);
                 return null;
             }
         }
@@ -1187,19 +1135,18 @@
             currentPreElement = null;
         }
         
+        // Lifecycle hook 2: Language changed
         function updateCodeBlockLanguage(preElement, language) {
             const code = preElement.querySelector('code');
             if (!code) return;
             
-            // Remove existing language classes
-            const classList = Array.from(code.classList);
-            classList.forEach(cls => {
+            // Update language class and attribute
+            code.classList.forEach(cls => {
                 if (cls.startsWith('language-')) {
                     code.classList.remove(cls);
                 }
             });
             
-            // Set new language
             if (language) {
                 code.classList.add(`language-${language}`);
                 code.setAttribute('data-language', language);
@@ -1207,29 +1154,19 @@
                 code.removeAttribute('data-language');
             }
             
-            // Update Monaco editor if it exists
+            // Update Monaco editor language
             if (monacoEditors.has(code)) {
                 const editor = monacoEditors.get(code);
                 const languageMap = getMonacoLanguageMap();
-                const monacoLanguage = languageMap[language] || language;
-                try {
-                    if (monaco && monaco.editor) {
-                        monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage || 'plaintext');
-                    }
-                } catch (e) {
-                    console.warn('Failed to update Monaco language:', e);
-                }
+                const monacoLanguage = language ? (languageMap[language] || language) : 'plaintext';
+                monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage);
             } else {
-                // Initialize Monaco if not already initialized
                 initMonacoEditor(code, language).catch(err => {
                     console.warn('Failed to initialize Monaco Editor:', err);
                 });
             }
             
-            // Update button
             updateCodeBlockLanguageButtons();
-            
-            // Notify that content has changed
             notifyChange();
         }
         
@@ -1954,6 +1891,11 @@
 
         // Handle checkbox clicks and table cell selection
         editor.addEventListener('click', (e) => {
+            // Don't interfere with Monaco editor
+            if (e.target.closest('.monaco-editor-container')) {
+                return;
+            }
+            
             if (e.target.type === 'checkbox') {
                 e.target.parentElement.classList.toggle('checked', e.target.checked);
                 notifyChange();
