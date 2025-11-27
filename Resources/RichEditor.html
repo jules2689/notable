@@ -803,7 +803,10 @@
                     fontSize: 14,
                     lineNumbers: 'off',
                     wordWrap: 'on',
-                    readOnly: false
+                    readOnly: false,
+                    // Ensure Enter key works
+                    acceptSuggestionOnEnter: 'off',
+                    quickSuggestions: false
                 });
                 
                 // Match background
@@ -1179,6 +1182,8 @@
         
         // Handle keyboard navigation in language menu
         document.addEventListener('keydown', (e) => {
+            // Don't interfere with Monaco editors
+            if (e.target.closest('.monaco-editor-container')) return;
             if (!languageMenu.classList.contains('show')) return;
             
             const items = languageMenu.querySelectorAll('.menu-item');
@@ -1774,13 +1779,29 @@
                     }
                 });
 
-                let html = clone.innerHTML;
+                // Convert callout containers to jinja syntax using DOM manipulation
+                // This ensures we capture all content including HTML
+                clone.querySelectorAll('div.callout').forEach(calloutDiv => {
+                    const calloutType = Array.from(calloutDiv.classList).find(cls => 
+                        cls !== 'callout' && ['info', 'warning', 'error', 'success'].includes(cls)
+                    ) || 'info';
+                    
+                    // Get the innerHTML to preserve any HTML content
+                    const calloutContent = calloutDiv.innerHTML.trim();
+                    
+                    // Convert HTML content to markdown for cleaner storage
+                    // Create a temporary element to convert just this callout's content
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = calloutContent;
+                    const markdownContent = turndownService.turndown(tempDiv.innerHTML);
+                    
+                    // Replace the callout div with jinja syntax text node
+                    const jinjaText = `{% callout ${calloutType} | ${markdownContent.trim()} %}`;
+                    const textNode = document.createTextNode(jinjaText);
+                    calloutDiv.replaceWith(textNode);
+                });
 
-                // Convert custom components back to {% %} syntax using data attributes
-                // Need to unescape the HTML entities from the attributes
-                
-                // Callouts: simple pattern
-                html = html.replace(/<div class="callout (\w+)">([^<]+)<\/div>/g, '{% callout $1 | $2 %}');
+                let html = clone.innerHTML;
 
                 // Convert task lists: Replace checkboxes with [ ] or [x] text while preserving HTML content
                 // This ensures turndown generates proper task list markdown: `- [ ] text` or `- [x] text`
@@ -1882,6 +1903,10 @@
 
         // Handle input changes
         editor.addEventListener('input', (e) => {
+            // Don't process input events from Monaco editors
+            if (e.target.closest('.monaco-editor-container')) {
+                return;
+            }
             handleMarkdownConversion(e);
             handleTableInput();
             applySyntaxHighlighting();
@@ -2984,6 +3009,9 @@
 
         // Keyboard navigation for slash menu and block exit
         document.addEventListener('keydown', (e) => {
+            // Don't interfere with Monaco editors
+            if (e.target.closest('.monaco-editor-container')) return;
+            
             // Handle table navigation and shortcuts
             const selection = window.getSelection();
             if (selection.rangeCount > 0) {
