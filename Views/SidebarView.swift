@@ -95,9 +95,6 @@ struct SidebarView: View {
                     viewModel: viewModel
                 )
             }
-            
-            // Git push button (always shown if git repo, not just when note is open)
-            GitPushButton(viewModel: viewModel)
         }
         .background(Color(nsColor: .textBackgroundColor))
         .padding(.top, -36)
@@ -113,6 +110,11 @@ struct SidebarFooter: View {
     let showReadTime: Bool
     let onSave: () -> Void
     let viewModel: NotesViewModel
+    
+    @AppStorage("autoCommitChanges") private var autoCommitChanges: Bool = false
+    @State private var isPushing = false
+    @State private var pushError: String?
+    @State private var isGitRepo = false
     
     private var wordCount: Int {
         let plaintext = markdownToPlaintext(content)
@@ -242,33 +244,61 @@ struct SidebarFooter: View {
             Divider()
             
             ViewThatFits {
-                // Try horizontal layout first (save status on left, word count/read time on right)
+                // Try horizontal layout first (save status and git push on left, word count/read time on right)
                 HStack(spacing: 12) {
-                    // Save status button
-                    Button {
-                        onSave()
-                    } label: {
-                        HStack(spacing: 4) {
-                            if isSaved {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.green)
-                                Text("Saved")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundStyle(.orange)
-                                Text("Unsaved")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                    // Save status button and Git push button side by side
+                    HStack(spacing: 6) {
+                        // Save status button
+                        Button {
+                            onSave()
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isSaved {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.green)
+                                    Text("Saved")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Image(systemName: "circle.fill")
+                                        .font(.system(size: 6))
+                                        .foregroundStyle(.orange)
+                                    Text("Unsaved")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        .disabled(isSaved)
+                        .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
+                        
+                        // Git push button (if git repo and auto-commit enabled)
+                        if isGitRepo && autoCommitChanges {
+                            Button {
+                                Task {
+                                    await pushToUpstream()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if isPushing {
+                                        ProgressView()
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.system(size: 10))
+                                    }
+                                    Text("Push")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isPushing)
+                            .quickTooltip("Push committed changes to upstream repository")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isSaved)
-                    .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
                     
                     Spacer()
                     
@@ -301,31 +331,59 @@ struct SidebarFooter: View {
                 
                 // Fall back to vertical layout if horizontal doesn't fit
                 VStack(alignment: .leading, spacing: 4) {
-                    // Save status button
-                    Button {
-                        onSave()
-                    } label: {
-                        HStack(spacing: 4) {
-                            if isSaved {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.green)
-                                Text("Saved")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Image(systemName: "circle.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundStyle(.orange)
-                                Text("Unsaved")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                    // Save status button and Git push button side by side
+                    HStack(spacing: 6) {
+                        // Save status button
+                        Button {
+                            onSave()
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isSaved {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.green)
+                                    Text("Saved")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Image(systemName: "circle.fill")
+                                        .font(.system(size: 6))
+                                        .foregroundStyle(.orange)
+                                    Text("Unsaved")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        .disabled(isSaved)
+                        .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
+                        
+                        // Git push button (if git repo and auto-commit enabled)
+                        if isGitRepo && autoCommitChanges {
+                            Button {
+                                Task {
+                                    await pushToUpstream()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if isPushing {
+                                        ProgressView()
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.system(size: 10))
+                                    }
+                                    Text("Push")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isPushing)
+                            .quickTooltip("Push committed changes to upstream repository")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isSaved)
-                    .quickTooltip(isSaved ? "Note is saved" : "Save the current note")
                     
                     // Word count and read time
                     if showWordCount {
@@ -355,7 +413,103 @@ struct SidebarFooter: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color(nsColor: .textBackgroundColor))
+            
+            // Git push error message (if any)
+            if let error = pushError {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                        
+                        Button {
+                            copyToClipboard(error)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .quickTooltip("Copy error message")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+            }
         }
+        .task {
+            await checkGitRepo()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .storageLocationChanged)) { _ in
+            Task {
+                await checkGitRepo()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gitRepositoryInitialized)) { _ in
+            Task {
+                await checkGitRepo()
+            }
+        }
+        .onChange(of: viewModel.currentNote) { _, _ in
+            // Re-check git repo status when note changes (in case repo was initialized)
+            Task {
+                await checkGitRepo()
+            }
+        }
+        .onChange(of: autoCommitChanges) { _, _ in
+            // Re-check git repo status when auto-commit setting changes
+            Task {
+                await checkGitRepo()
+            }
+        }
+    }
+    
+    private func checkGitRepo() async {
+        await MainActor.run {
+            let gitService = GitService()
+            isGitRepo = gitService.isGitRepository()
+        }
+    }
+    
+    private func pushToUpstream() async {
+        await MainActor.run {
+            isPushing = true
+            pushError = nil
+        }
+        
+        do {
+            let gitService = GitService()
+            try await gitService.pushToUpstream()
+            // Clear any previous error on success
+            await MainActor.run {
+                pushError = nil
+                isPushing = false
+            }
+        } catch {
+            // Extract detailed error information
+            var errorMessage = error.localizedDescription
+            if let gitError = error as? GitError {
+                errorMessage = gitError.localizedDescription ?? errorMessage
+            } else {
+                // Try to get more details from the error
+                let errorString = String(describing: error)
+                if errorString != errorMessage {
+                    errorMessage = "\(errorMessage)\n\nFull error: \(errorString)"
+                }
+            }
+            
+            await MainActor.run {
+                pushError = errorMessage
+                isPushing = false
+            }
+        }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 }
 
@@ -841,147 +995,6 @@ struct TapBlockingView: NSViewRepresentable {
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
             return true
         }
-    }
-}
-
-// MARK: - Git Push Button
-
-struct GitPushButton: View {
-    let viewModel: NotesViewModel
-    @AppStorage("autoCommitChanges") private var autoCommitChanges: Bool = false
-    @State private var isPushing = false
-    @State private var pushError: String?
-    @State private var isGitRepo = false
-    
-    var body: some View {
-        Group {
-            if isGitRepo && autoCommitChanges {
-                VStack(spacing: 0) {
-                    Divider()
-                    
-                    Button {
-                        Task {
-                            await pushToUpstream()
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isPushing {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                            } else {
-                                Image(systemName: "arrow.up.circle.fill")
-                                    .font(.system(size: 12))
-                            }
-                            Text("Push to Git")
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isPushing)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(nsColor: .textBackgroundColor))
-                    .quickTooltip("Push committed changes to upstream repository")
-                    
-                    if let error = pushError {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top, spacing: 6) {
-                                Text(error)
-                                    .font(.caption2)
-                                    .foregroundStyle(.red)
-                                    .textSelection(.enabled)
-                                
-                                Button {
-                                    copyToClipboard(error)
-                                } label: {
-                                    Image(systemName: "doc.on.doc")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .help("Copy error message")
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 4)
-                    }
-                }
-            }
-        }
-        .task {
-            await checkGitRepo()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .storageLocationChanged)) { _ in
-            Task {
-                await checkGitRepo()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .gitRepositoryInitialized)) { _ in
-            Task {
-                await checkGitRepo()
-            }
-        }
-        .onChange(of: viewModel.currentNote) { _, _ in
-            // Re-check git repo status when note changes (in case repo was initialized)
-            Task {
-                await checkGitRepo()
-            }
-        }
-        .onChange(of: autoCommitChanges) { _, _ in
-            // Re-check git repo status when auto-commit setting changes
-            Task {
-                await checkGitRepo()
-            }
-        }
-    }
-    
-    private func checkGitRepo() async {
-        await MainActor.run {
-            let gitService = GitService()
-            isGitRepo = gitService.isGitRepository()
-        }
-    }
-    
-    private func pushToUpstream() async {
-        await MainActor.run {
-            isPushing = true
-            pushError = nil
-        }
-        
-        do {
-            let gitService = GitService()
-            try await gitService.pushToUpstream()
-            // Clear any previous error on success
-            await MainActor.run {
-                pushError = nil
-                isPushing = false
-            }
-        } catch {
-            // Extract detailed error information
-            var errorMessage = error.localizedDescription
-            if let gitError = error as? GitError {
-                errorMessage = gitError.localizedDescription ?? errorMessage
-            } else {
-                // Try to get more details from the error
-                let errorString = String(describing: error)
-                if errorString != errorMessage {
-                    errorMessage = "\(errorMessage)\n\nFull error: \(errorString)"
-                }
-            }
-            
-            await MainActor.run {
-                pushError = errorMessage
-                isPushing = false
-            }
-        }
-    }
-    
-    private func copyToClipboard(_ text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
     }
 }
 

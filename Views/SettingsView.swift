@@ -127,13 +127,13 @@ struct SettingsView: View {
                 
                 Section("Git Integration") {
                     Toggle("Auto-commit changes on save", isOn: $autoCommitChanges)
-                        .help("Automatically commit note changes to git when saving (only works if the notes folder is a git repository)")
+                        .quickTooltip("Automatically commit note changes to git when saving (only works if the notes folder is a git repository)")
                     
                     TextField("Git User Name", text: $gitUserName)
-                        .help("Your name for git commits")
+                        .quickTooltip("Your name for git commits")
                     
                     TextField("Git User Email", text: $gitUserEmail)
-                        .help("Your email for git commits")
+                        .quickTooltip("Your email for git commits")
                     
                     if autoCommitChanges {
                         if !isGitRepo {
@@ -154,7 +154,7 @@ struct SettingsView: View {
                                 }
                             }
                             .disabled(isInitializingGit)
-                            .help("Initialize a git repository in the notes folder")
+                            .quickTooltip("Initialize a git repository in the notes folder")
                             
                             if let error = gitErrorMessage {
                                 HStack(alignment: .top, spacing: 6) {
@@ -171,7 +171,7 @@ struct SettingsView: View {
                                             .foregroundStyle(.secondary)
                                     }
                                     .buttonStyle(.plain)
-                                    .help("Copy error message")
+                                    .quickTooltip("Copy error message")
                                 }
                             }
                         } else {
@@ -179,13 +179,13 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 TextField("Upstream URL", text: $upstreamURL)
                                     .textFieldStyle(.roundedBorder)
-                                    .help("Git remote URL (HTTPS or file:// only, e.g., https://github.com/user/repo.git)")
+                                    .quickTooltip("Git remote URL (HTTPS or file:// only, e.g., https://github.com/user/repo.git)")
                                 
                                 // Show token field if URL is HTTPS
                                 if upstreamURL.hasPrefix("https://") {
                                     SecureField("HTTPS Token/Password", text: $gitHTTPSToken)
                                         .textFieldStyle(.roundedBorder)
-                                        .help("Personal access token or password for HTTPS authentication")
+                                        .quickTooltip("Personal access token or password for HTTPS authentication")
                                 }
                                 
                                 Button {
@@ -204,7 +204,7 @@ struct SettingsView: View {
                                     }
                                 }
                                 .disabled(isSavingUpstream || upstreamURL.isEmpty)
-                                .help("Save the upstream repository URL")
+                                .quickTooltip("Save the upstream repository URL")
                                 
                                 if let error = gitErrorMessage {
                                     HStack(alignment: .top, spacing: 6) {
@@ -221,7 +221,7 @@ struct SettingsView: View {
                                                 .foregroundStyle(.secondary)
                                         }
                                         .buttonStyle(.plain)
-                                        .help("Copy error message")
+                                        .quickTooltip("Copy error message")
                                     }
                                 }
                                 
@@ -340,7 +340,7 @@ struct SettingsView: View {
                                         .foregroundStyle(pathCopied ? .green : .secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help("Copy path to clipboard")
+                                .quickTooltip("Copy path to clipboard")
                             }
                         }
                     }

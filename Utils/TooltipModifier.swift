@@ -38,6 +38,7 @@ class TooltipNSView: NSView {
     let tooltipText: String
     let delay: TimeInterval
     var tooltipTimer: Timer?
+    var timeoutTimer: Timer?
     var trackingArea: NSTrackingArea?
     var tooltipWindow: NSWindow?
     var clickMonitor: Any?
@@ -134,6 +135,8 @@ class TooltipNSView: NSView {
         // Cancel tooltip
         tooltipTimer?.invalidate()
         tooltipTimer = nil
+        timeoutTimer?.invalidate()
+        timeoutTimer = nil
         hideTooltip()
     }
     
@@ -257,9 +260,20 @@ class TooltipNSView: NSView {
         tooltipWindow.setFrameOrigin(screenPoint)
         tooltipWindow.orderFront(nil)
         self.tooltipWindow = tooltipWindow
+        
+        // Set up automatic timeout after 5 seconds
+        timeoutTimer?.invalidate()
+        timeoutTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.hideTooltip()
+            }
+        }
     }
     
     private func hideTooltip() {
+        timeoutTimer?.invalidate()
+        timeoutTimer = nil
         tooltipWindow?.orderOut(nil)
         tooltipWindow = nil
     }
@@ -269,8 +283,9 @@ class TooltipNSView: NSView {
         // Since NSView deinit is always on main thread, we can assume main actor isolation
         if Thread.isMainThread {
             MainActor.assumeIsolated {
-                // Invalidate timer
+                // Invalidate timers
                 self.tooltipTimer?.invalidate()
+                self.timeoutTimer?.invalidate()
                 
                 // Remove click monitor
                 self.removeClickMonitor()
