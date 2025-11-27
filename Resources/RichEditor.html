@@ -101,6 +101,7 @@
         }
 
         pre {
+            position: relative;
             background-color: var(--code-bg);
             padding: 12px;
             border-radius: 6px;
@@ -136,6 +137,21 @@
             background: transparent !important;
         }
         
+        /* Ensure text selection works in Monaco */
+        pre .monaco-editor-container .monaco-editor .view-lines,
+        pre .monaco-editor-container .monaco-editor .view-line,
+        pre .monaco-editor-container .monaco-editor .view-line span {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+        }
+        
+        pre .monaco-editor-container .monaco-editor .inputarea {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+        
         pre .code-language-button {
             position: absolute;
             top: 8px;
@@ -148,11 +164,13 @@
             border: 1px solid var(--border-color);
             border-radius: 4px;
             cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            z-index: 10;
+            opacity: 0.85;
+            transition: opacity 0.2s ease, background 0.2s ease;
+            z-index: 10000;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             user-select: none;
+            pointer-events: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
         }
         pre:hover .code-language-button {
             opacity: 1;
@@ -495,6 +513,47 @@
             headingStyle: 'atx',
             codeBlockStyle: 'fenced'
         });
+        
+        // Add custom rule to preserve language in code blocks
+        // High priority to override default code block rule
+        turndownService.addRule('codeBlock', {
+            filter: function(node) {
+                return node.nodeName === 'PRE' && node.querySelector('code');
+            },
+            replacement: function(content, node) {
+                const code = node.querySelector('code');
+                if (!code) return content;
+                
+                // Get language from class or data attribute
+                let language = '';
+                const classList = code.className.split(/\s+/);
+                for (const className of classList) {
+                    if (className.startsWith('language-')) {
+                        language = className.substring(9);
+                        break;
+                    }
+                }
+                if (!language) {
+                    language = code.getAttribute('data-language') || '';
+                }
+                
+                // Get code content
+                let codeContent = '';
+                if (code.getAttribute('data-original-text') !== null) {
+                    codeContent = code.getAttribute('data-original-text');
+                } else {
+                    codeContent = code.textContent || '';
+                }
+                
+                // Return fenced code block with language
+                if (language) {
+                    return '\n```' + language + '\n' + codeContent + '\n```\n';
+                } else {
+                    return '\n```\n' + codeContent + '\n```\n';
+                }
+            },
+            priority: 100 // High priority to run before default code block rule
+        });
 
         // Add table support to turndown
         turndownService.addRule('table', {
@@ -757,7 +816,14 @@
                     hideCursorInOverviewRuler: true,
                     overviewRulerLanes: 0,
                     wordWrap: 'on',
-                    padding: { top: 0, bottom: 0 }
+                    padding: { top: 0, bottom: 0 },
+                    readOnly: false,
+                    selectOnLineNumbers: true,
+                    quickSuggestions: false,
+                    suggestOnTriggerCharacters: false,
+                    acceptSuggestionOnEnter: 'off',
+                    tabCompletion: 'off',
+                    wordBasedSuggestions: false
                 });
                 
                 // Match background color
@@ -802,6 +868,11 @@
                 
                 updateHeight();
                 monacoEditors.set(codeElement, editor);
+                
+                // Ensure language button is created after Monaco initialization
+                setTimeout(() => {
+                    updateCodeBlockLanguageButtons();
+                }, 50);
                 
                 // Theme changes
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -964,6 +1035,85 @@
             { name: 'Lua', value: 'lua' }
         ];
         
+        function showLanguageMenuForCodeBlock(preElement) {
+            currentPreElement = preElement;
+            const code = preElement.querySelector('code');
+            if (!code) return;
+            
+            // Get current language
+            let currentLanguage = '';
+            const classList = code.className.split(/\s+/);
+            for (const className of classList) {
+                if (className.startsWith('language-')) {
+                    currentLanguage = className.substring(9);
+                    break;
+                }
+            }
+            if (!currentLanguage) {
+                currentLanguage = code.getAttribute('data-language') || '';
+            }
+            
+            // Populate menu
+            languageMenu.innerHTML = '';
+            programmingLanguages.forEach(lang => {
+                const item = document.createElement('div');
+                item.className = 'menu-item';
+                if (lang.value === currentLanguage) {
+                    item.classList.add('selected');
+                }
+                item.textContent = lang.name;
+                item.addEventListener('click', () => {
+                    updateCodeBlockLanguage(preElement, lang.value);
+                    hideLanguageMenu();
+                    // Focus back on the code block
+                    setTimeout(() => {
+                        code.focus();
+                        const range = document.createRange();
+                        range.selectNodeContents(code);
+                        range.collapse(false);
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }, 10);
+                });
+                languageMenu.appendChild(item);
+            });
+            
+            // Position menu to the left of the code block
+            // First show the menu to get its dimensions
+            languageMenu.classList.add('show');
+            const menuWidth = languageMenu.offsetWidth;
+            const menuHeight = languageMenu.offsetHeight;
+            
+            const rect = preElement.getBoundingClientRect();
+            const scrollX = window.scrollX || window.pageXOffset;
+            const scrollY = window.scrollY || window.pageYOffset;
+            
+            // Position to the left of the code block
+            let leftPos = rect.left + scrollX - menuWidth - 8;
+            let topPos = rect.top + scrollY + 4;
+            
+            // Ensure it doesn't go off the left edge
+            if (leftPos < scrollX + 8) {
+                leftPos = scrollX + 8;
+            }
+            
+            // Ensure it doesn't go off the bottom
+            const viewportHeight = window.innerHeight;
+            if (topPos + menuHeight > scrollY + viewportHeight - 8) {
+                topPos = scrollY + viewportHeight - menuHeight - 8;
+            }
+            
+            languageMenu.style.left = leftPos + 'px';
+            languageMenu.style.top = topPos + 'px';
+            
+            // Select first item if none selected
+            const selected = languageMenu.querySelector('.menu-item.selected');
+            if (!selected && languageMenu.querySelector('.menu-item')) {
+                languageMenu.querySelector('.menu-item').classList.add('selected');
+            }
+        }
+        
         function showLanguageMenuForButton(buttonRect, preElement) {
             currentPreElement = preElement;
             const code = preElement.querySelector('code');
@@ -998,10 +1148,38 @@
                 languageMenu.appendChild(item);
             });
             
-            // Position menu
-            languageMenu.style.left = (buttonRect.right - languageMenu.offsetWidth) + 'px';
-            languageMenu.style.top = (buttonRect.bottom + 4) + 'px';
+            // Position menu to the left of the button
+            // First show the menu to get its dimensions
             languageMenu.classList.add('show');
+            const menuWidth = languageMenu.offsetWidth;
+            const menuHeight = languageMenu.offsetHeight;
+            
+            const scrollX = window.scrollX || window.pageXOffset;
+            const scrollY = window.scrollY || window.pageYOffset;
+            
+            // Position to the left of the button
+            let leftPos = buttonRect.left + scrollX - menuWidth - 8;
+            let topPos = buttonRect.bottom + scrollY + 4;
+            
+            // Ensure it doesn't go off the left edge
+            if (leftPos < scrollX + 8) {
+                leftPos = scrollX + 8;
+            }
+            
+            // Ensure it doesn't go off the bottom
+            const viewportHeight = window.innerHeight;
+            if (topPos + menuHeight > scrollY + viewportHeight - 8) {
+                topPos = scrollY + viewportHeight - menuHeight - 8;
+            }
+            
+            languageMenu.style.left = leftPos + 'px';
+            languageMenu.style.top = topPos + 'px';
+            
+            // Select first item if none selected
+            const selected = languageMenu.querySelector('.menu-item.selected');
+            if (!selected && languageMenu.querySelector('.menu-item')) {
+                languageMenu.querySelector('.menu-item').classList.add('selected');
+            }
         }
         
         function hideLanguageMenu() {
@@ -1050,6 +1228,9 @@
             
             // Update button
             updateCodeBlockLanguageButtons();
+            
+            // Notify that content has changed
+            notifyChange();
         }
         
         // Close language menu on outside click
@@ -1058,6 +1239,52 @@
                 hideLanguageMenu();
             }
         });
+        
+        // Handle keyboard navigation in language menu
+        document.addEventListener('keydown', (e) => {
+            if (!languageMenu.classList.contains('show')) return;
+            
+            const items = languageMenu.querySelectorAll('.menu-item');
+            if (items.length === 0) return;
+            
+            const selected = languageMenu.querySelector('.menu-item.selected');
+            let currentIndex = -1;
+            
+            if (selected) {
+                currentIndex = Array.from(items).indexOf(selected);
+            } else {
+                // If no item is selected, select the first one
+                items[0].classList.add('selected');
+                currentIndex = 0;
+            }
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+                items[currentIndex]?.classList.remove('selected');
+                items[nextIndex].classList.add('selected');
+                items[nextIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+                items[currentIndex]?.classList.remove('selected');
+                items[prevIndex].classList.add('selected');
+                items[prevIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedItem = languageMenu.querySelector('.menu-item.selected') || items[0];
+                if (selectedItem) {
+                    selectedItem.click();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                hideLanguageMenu();
+            }
+        }, true); // Use capture phase to handle before other handlers
 
         // Initialize iframes after they're in the DOM
         function initializeIframes() {
@@ -1457,8 +1684,27 @@
         // Convert HTML back to markdown
         function getMarkdown() {
             try {
-                // Extract content from Monaco editors before cloning
+                // Extract content from Monaco editors and ensure language is preserved
                 document.querySelectorAll('pre code').forEach(codeElement => {
+                    // Get language from class or data attribute
+                    let language = '';
+                    const classList = codeElement.className.split(/\s+/);
+                    for (const className of classList) {
+                        if (className.startsWith('language-')) {
+                            language = className.substring(9);
+                            break;
+                        }
+                    }
+                    if (!language) {
+                        language = codeElement.getAttribute('data-language') || '';
+                    }
+                    
+                    // Ensure language is stored in data attribute
+                    if (language) {
+                        codeElement.setAttribute('data-language', language);
+                    }
+                    
+                    // Get content from Monaco if available
                     if (monacoEditors.has(codeElement)) {
                         try {
                             const monacoEditor = monacoEditors.get(codeElement);
@@ -1467,6 +1713,15 @@
                             codeElement.setAttribute('data-original-text', content);
                         } catch (e) {
                             console.warn('Failed to get content from Monaco editor:', e);
+                            // Fallback to textContent if Monaco fails
+                            const fallbackContent = codeElement.textContent || '';
+                            codeElement.setAttribute('data-original-text', fallbackContent);
+                        }
+                    } else {
+                        // For code blocks without Monaco, use textContent
+                        const content = codeElement.textContent || codeElement.innerText || '';
+                        if (content.trim()) {
+                            codeElement.setAttribute('data-original-text', content);
                         }
                     }
                 });
@@ -1475,17 +1730,44 @@
                 const clone = editor.cloneNode(true);
                 
                 // Remove Monaco containers and restore text content
+                // The language should already be in data-language attribute from the clone
                 clone.querySelectorAll('pre code').forEach(codeElement => {
+                    // Remove Monaco container first
+                    const monacoContainer = codeElement.querySelector('.monaco-editor-container');
+                    if (monacoContainer) {
+                        monacoContainer.remove();
+                    }
+                    
+                    // Get content from data-original-text if available
                     const originalText = codeElement.getAttribute('data-original-text');
                     if (originalText !== null) {
-                        // Remove Monaco container
-                        const monacoContainer = codeElement.querySelector('.monaco-editor-container');
-                        if (monacoContainer) {
-                            monacoContainer.remove();
-                        }
-                        // Restore original text
+                        // Clear all children and set text content
+                        // Keep data-original-text for turndown rule to use
+                        codeElement.innerHTML = '';
                         codeElement.textContent = originalText;
-                        codeElement.removeAttribute('data-original-text');
+                        // Don't remove data-original-text yet - turndown rule needs it
+                    } else {
+                        // If no data-original-text, ensure textContent is clean
+                        // Remove any Monaco-related elements that might still be there
+                        codeElement.querySelectorAll('.monaco-editor-container, .monaco-editor').forEach(el => el.remove());
+                        // Get clean text content
+                        const text = codeElement.textContent || codeElement.innerText || '';
+                        codeElement.innerHTML = '';
+                        codeElement.textContent = text;
+                    }
+                    
+                    // Ensure language class is set if data-language exists
+                    const language = codeElement.getAttribute('data-language');
+                    if (language) {
+                        // Remove existing language classes
+                        const classList = Array.from(codeElement.classList);
+                        classList.forEach(cls => {
+                            if (cls.startsWith('language-')) {
+                                codeElement.classList.remove(cls);
+                            }
+                        });
+                        // Add language class
+                        codeElement.classList.add(`language-${language}`);
                     }
                 });
 
@@ -2248,6 +2530,11 @@
                     pre.appendChild(code);
                     node.replaceWith(pre);
                     placeCursorAtEnd(code);
+                    
+                    // Show language menu for the new code block
+                    setTimeout(() => {
+                        showLanguageMenuForCodeBlock(pre);
+                    }, 50);
                     return;
                 }
             }, 0);
