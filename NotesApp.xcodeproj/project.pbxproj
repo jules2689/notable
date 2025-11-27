@@ -1254,6 +1254,7 @@
 		AA0023 /* StorageLocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0023 /* StorageLocationManager.swift */; };
 		AA0024 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0024 /* WebDAVService.swift */; };
 		AA0025 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0025 /* KeychainHelper.swift */; };
+		AA0026 /* GitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0026 /* GitService.swift */; };
 		AA0027 /* WindowDragView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0027 /* WindowDragView.swift */; };
 		AA0028 /* TabItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0028 /* TabItem.swift */; };
 		AA0029 /* TooltipModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0029 /* TooltipModifier.swift */; };
@@ -1265,6 +1266,7 @@
 		AA0035 /* AnimatedIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0035 /* AnimatedIconView.swift */; };
 		AA0036 /* MetadataParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0036 /* MetadataParser.swift */; };
 		PP0001 /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0001 /* Down */; };
+		PP0002 /* SwiftGitX in Frameworks */ = {isa = PBXBuildFile; productRef = QQ0002 /* SwiftGitX */; };
 		UU0001 /* monaco-editor in Copy Files */ = {isa = PBXBuildFile; fileRef = 733EDEB02ED7C65D00296350 /* monaco-editor */; };
 /* End PBXBuildFile section */
 
@@ -2691,6 +2693,7 @@
 		BB0023 /* StorageLocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageLocationManager.swift; sourceTree = "<group>"; };
 		BB0024 /* WebDAVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebDAVService.swift; sourceTree = "<group>"; };
 		BB0025 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		BB0026 /* GitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitService.swift; sourceTree = "<group>"; };
 		BB0027 /* WindowDragView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDragView.swift; sourceTree = "<group>"; };
 		BB0028 /* TabItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabItem.swift; sourceTree = "<group>"; };
 		BB0029 /* TooltipModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TooltipModifier.swift; sourceTree = "<group>"; };
@@ -2710,6 +2713,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				PP0001 /* Down in Frameworks */,
+				PP0002 /* SwiftGit2 in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -8962,6 +8966,7 @@
 			children = (
 				BB0009 /* FileSystemService.swift */,
 				BB0024 /* WebDAVService.swift */,
+				BB0026 /* GitService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -9014,6 +9019,7 @@
 			name = NotesApp;
 			packageProductDependencies = (
 				QQ0001 /* Down */,
+				QQ0002 /* SwiftGit2 */,
 			);
 			productName = Notable;
 			productReference = CC0001 /* Notable.app */;
@@ -9045,6 +9051,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				RR0001 /* XCRemoteSwiftPackageReference "Down" */,
+				RR0002 /* XCRemoteSwiftPackageReference "SwiftGit2" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = GG0001 /* Products */;
@@ -9100,6 +9107,7 @@
 				AA0023 /* StorageLocationManager.swift in Sources */,
 				AA0024 /* WebDAVService.swift in Sources */,
 				AA0025 /* KeychainHelper.swift in Sources */,
+				AA0026 /* GitService.swift in Sources */,
 				AA0027 /* WindowDragView.swift in Sources */,
 				AA0028 /* TabItem.swift in Sources */,
 				AA0029 /* TooltipModifier.swift in Sources */,
@@ -9322,6 +9330,14 @@
 				minimumVersion = 0.11.0;
 			};
 		};
+		RR0002 /* XCRemoteSwiftPackageReference "SwiftGitX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ibrahimcetin/SwiftGitX.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -9329,6 +9345,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = RR0001 /* XCRemoteSwiftPackageReference "Down" */;
 			productName = Down;
+		};
+		QQ0002 /* SwiftGitX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = RR0002 /* XCRemoteSwiftPackageReference "SwiftGitX" */;
+			productName = SwiftGitX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

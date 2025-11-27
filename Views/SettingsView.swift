@@ -3,6 +3,7 @@ import AppKit
 
 extension Notification.Name {
     static let storageLocationChanged = Notification.Name("storageLocationChanged")
+    static let gitRepositoryInitialized = Notification.Name("gitRepositoryInitialized")
 }
 
 enum AppearanceMode: String, CaseIterable {
@@ -43,6 +44,10 @@ struct SettingsView: View {
     @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
     @AppStorage("showWordCount") private var showWordCount: Bool = true
     @AppStorage("showReadTime") private var showReadTime: Bool = true
+    @AppStorage("autoCommitChanges") private var autoCommitChanges: Bool = false
+    @AppStorage("gitUserName") private var gitUserName: String = ""
+    @AppStorage("gitUserEmail") private var gitUserEmail: String = ""
+    @AppStorage("gitHTTPSToken") private var gitHTTPSToken: String = ""
     @State private var storageType: StorageLocationType = StorageLocationManager.shared.storageType
     @State private var customPath: String = StorageLocationManager.shared.customPath ?? ""
     @State private var webdavServerURL: String = StorageLocationManager.shared.webdavServerURL?.absoluteString ?? ""
@@ -57,9 +62,16 @@ struct SettingsView: View {
     @State private var connectionTestColor: Color = .red
     @State private var pathCopied = false
     @State private var logsPathCopied = false
+    @State private var isGitRepo = false
+    @State private var upstreamURL: String = ""
+    @State private var isInitializingGit = false
+    @State private var isSavingUpstream = false
+    @State private var gitErrorMessage: String?
+    @State private var gitSuccessMessage: String?
     @Environment(\.dismiss) private var dismiss
     
     private let storageManager = StorageLocationManager.shared
+    private let gitService = GitService()
     
     /// Gets the logs directory path for the app
     private var logsDirectoryPath: String {
@@ -111,6 +123,116 @@ struct SettingsView: View {
                 Section("Editor") {
                     Toggle("Show Word Count", isOn: $showWordCount)
                     Toggle("Show Estimated Read Time", isOn: $showReadTime)
+                }
+                
+                Section("Git Integration") {
+                    Toggle("Auto-commit changes on save", isOn: $autoCommitChanges)
+                        .help("Automatically commit note changes to git when saving (only works if the notes folder is a git repository)")
+                    
+                    TextField("Git User Name", text: $gitUserName)
+                        .help("Your name for git commits")
+                    
+                    TextField("Git User Email", text: $gitUserEmail)
+                        .help("Your email for git commits")
+                    
+                    if autoCommitChanges {
+                        if !isGitRepo {
+                            // Show initialize button if auto-commit is enabled but not a git repo
+                            Button {
+                                Task {
+                                    await initializeGitRepository()
+                                }
+                            } label: {
+                                HStack {
+                                    if isInitializingGit {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "plus.circle.fill")
+                                    }
+                                    Text("Initialize Git Repository")
+                                }
+                            }
+                            .disabled(isInitializingGit)
+                            .help("Initialize a git repository in the notes folder")
+                            
+                            if let error = gitErrorMessage {
+                                HStack(alignment: .top, spacing: 6) {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                        .textSelection(.enabled)
+                                    
+                                    Button {
+                                        copyToClipboard(error)
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Copy error message")
+                                }
+                            }
+                        } else {
+                            // Show upstream URL field if it is a git repo
+                            VStack(alignment: .leading, spacing: 8) {
+                                TextField("Upstream URL", text: $upstreamURL)
+                                    .textFieldStyle(.roundedBorder)
+                                    .help("Git remote URL (HTTPS or file:// only, e.g., https://github.com/user/repo.git)")
+                                
+                                // Show token field if URL is HTTPS
+                                if upstreamURL.hasPrefix("https://") {
+                                    SecureField("HTTPS Token/Password", text: $gitHTTPSToken)
+                                        .textFieldStyle(.roundedBorder)
+                                        .help("Personal access token or password for HTTPS authentication")
+                                }
+                                
+                                Button {
+                                    Task {
+                                        await saveUpstreamURL()
+                                    }
+                                } label: {
+                                    HStack {
+                                        if isSavingUpstream {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                        } else {
+                                            Image(systemName: "checkmark.circle.fill")
+                                        }
+                                        Text("Save Upstream URL")
+                                    }
+                                }
+                                .disabled(isSavingUpstream || upstreamURL.isEmpty)
+                                .help("Save the upstream repository URL")
+                                
+                                if let error = gitErrorMessage {
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Text(error)
+                                            .font(.caption)
+                                            .foregroundStyle(.red)
+                                            .textSelection(.enabled)
+                                        
+                                        Button {
+                                            copyToClipboard(error)
+                                        } label: {
+                                            Image(systemName: "doc.on.doc")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Copy error message")
+                                    }
+                                }
+                                
+                                if let success = gitSuccessMessage {
+                                    Text(success)
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 Section("Storage Location") {
@@ -306,6 +428,23 @@ struct SettingsView: View {
             webdavServerURL = storageManager.webdavServerURL?.absoluteString ?? ""
             webdavUsername = storageManager.webdavUsername ?? ""
             // Don't load password from keychain in UI for security
+            
+            // Check git repo status
+            Task {
+                await checkGitRepositoryStatus()
+            }
+        }
+        .onChange(of: autoCommitChanges) { _, _ in
+            // Re-check git status when auto-commit setting changes
+            Task {
+                await checkGitRepositoryStatus()
+            }
+        }
+        .onChange(of: storageType) { _, _ in
+            // Re-check git status when storage location changes
+            Task {
+                await checkGitRepositoryStatus()
+            }
         }
     }
     
@@ -392,6 +531,90 @@ struct SettingsView: View {
         logsPathCopied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             logsPathCopied = false
+        }
+    }
+    
+    private func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+    
+    
+    private func checkGitRepositoryStatus() async {
+        isGitRepo = gitService.isGitRepository()
+        
+        if isGitRepo {
+            // Load current upstream URL
+            do {
+                if let url = try await gitService.getUpstreamURL() {
+                    await MainActor.run {
+                        upstreamURL = url
+                    }
+                } else {
+                    await MainActor.run {
+                        upstreamURL = ""
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    upstreamURL = ""
+                }
+            }
+        } else {
+            await MainActor.run {
+                upstreamURL = ""
+            }
+        }
+        
+        await MainActor.run {
+            gitErrorMessage = nil
+            gitSuccessMessage = nil
+        }
+    }
+    
+    private func initializeGitRepository() async {
+        isInitializingGit = true
+        gitErrorMessage = nil
+        gitSuccessMessage = nil
+        
+        do {
+            try await gitService.initializeGitRepository()
+            await MainActor.run {
+                isInitializingGit = false
+                isGitRepo = true
+                gitSuccessMessage = "Git repository initialized successfully"
+            }
+            
+            // Re-check status to load upstream URL
+            await checkGitRepositoryStatus()
+            
+            // Notify that git repo was initialized so sidebar can update
+            NotificationCenter.default.post(name: .gitRepositoryInitialized, object: nil)
+        } catch {
+            await MainActor.run {
+                isInitializingGit = false
+                gitErrorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func saveUpstreamURL() async {
+        isSavingUpstream = true
+        gitErrorMessage = nil
+        gitSuccessMessage = nil
+        
+        do {
+            try await gitService.setUpstreamURL(upstreamURL)
+            await MainActor.run {
+                isSavingUpstream = false
+                gitSuccessMessage = "Upstream URL saved successfully"
+            }
+        } catch {
+            await MainActor.run {
+                isSavingUpstream = false
+                gitErrorMessage = error.localizedDescription
+            }
         }
     }
 }

@@ -192,6 +192,31 @@ class NotesViewModel: @unchecked Sendable {
             // Small delay to ensure file system has flushed the write
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             
+            // Auto-commit if enabled and directory is a git repo
+            // Since NotesViewModel is @MainActor, we can directly use GitService
+            let autoCommitEnabled = UserDefaults.standard.bool(forKey: "autoCommitChanges")
+            if autoCommitEnabled {
+                let gitService = GitService()
+                if gitService.isGitRepository() {
+                    let commitMessage = "Update: \(note.title)"
+                    do {
+                        try await gitService.commitChanges(message: commitMessage)
+                        print("✅ Auto-committed: \(commitMessage)")
+                    } catch {
+                        // Log detailed error but don't fail the save
+                        if let gitError = error as? GitError {
+                            print("❌ Failed to auto-commit: \(gitError.localizedDescription)")
+                        } else {
+                            // Try to extract more details from SwiftGitX errors
+                            let errorDescription = error.localizedDescription
+                            print("❌ Failed to auto-commit: \(errorDescription)")
+                            // Print full error details for debugging
+                            print("   Full error: \(error)")
+                        }
+                    }
+                }
+            }
+            
             // Reload notes to get fresh content from disk
             await loadNotes()
         } catch {
