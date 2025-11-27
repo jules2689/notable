@@ -388,6 +388,45 @@
             font-size: 12px;
             color: var(--secondary-color);
         }
+
+        /* Emoji picker menu */
+        #emoji-menu {
+            position: fixed;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            min-width: 250px;
+        }
+        #emoji-menu .menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #emoji-menu .menu-item:hover,
+        #emoji-menu .menu-item.selected {
+            background-color: var(--code-bg);
+        }
+        #emoji-menu .menu-item .emoji {
+            font-size: 20px;
+            width: 28px;
+            text-align: center;
+        }
+        #emoji-menu .menu-item .name {
+            font-weight: 500;
+            flex: 1;
+        }
+        #emoji-menu .menu-item .aliases {
+            font-size: 11px;
+            color: var(--secondary-color);
+        }
         
         /* Language menu */
         #language-menu {
@@ -490,6 +529,7 @@
 <body>
     <div id="editor" contenteditable="true"></div>
     <div id="slash-menu"></div>
+    <div id="emoji-menu"></div>
     <div id="language-menu"></div>
     <div id="block-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> to exit block</div>
     <div id="table-hint">
@@ -622,12 +662,17 @@
 
         const editor = document.getElementById('editor');
         const slashMenu = document.getElementById('slash-menu');
+        const emojiMenu = document.getElementById('emoji-menu');
         const blockHint = document.getElementById('block-hint');
         const tableHint = document.getElementById('table-hint');
 
         let slashMenuVisible = false;
         let slashMenuItems = [];
         let selectedItemIndex = 0;
+        
+        let emojiMenuVisible = false;
+        let emojiMenuItems = [];
+        let selectedEmojiIndex = 0;
 
         // Slash commands
         const slashCommands = [
@@ -657,6 +702,202 @@
                 insertText: '{% map New York, NY %}',
                 isTextInsert: true
             }
+        ];
+
+        // Emoji data - common emojis with their names and aliases
+        const emojiData = [
+            { emoji: '😀', names: ['grinning', 'smile', 'happy'] },
+            { emoji: '😃', names: ['smiley', 'happy', 'joy'] },
+            { emoji: '😄', names: ['smile', 'happy', 'joy', 'laugh'] },
+            { emoji: '😁', names: ['grin', 'happy'] },
+            { emoji: '😅', names: ['sweat_smile', 'nervous'] },
+            { emoji: '😂', names: ['joy', 'laugh', 'tears'] },
+            { emoji: '🤣', names: ['rofl', 'laughing', 'lol'] },
+            { emoji: '😊', names: ['blush', 'smile', 'happy'] },
+            { emoji: '😇', names: ['innocent', 'angel', 'halo'] },
+            { emoji: '🙂', names: ['slightly_smiling', 'smile'] },
+            { emoji: '🙃', names: ['upside_down', 'flip'] },
+            { emoji: '😉', names: ['wink', 'wink_face'] },
+            { emoji: '😌', names: ['relieved', 'relaxed'] },
+            { emoji: '😍', names: ['heart_eyes', 'love', 'crush'] },
+            { emoji: '🥰', names: ['smiling_hearts', 'love'] },
+            { emoji: '😘', names: ['kissing_heart', 'kiss'] },
+            { emoji: '😗', names: ['kissing', 'kiss'] },
+            { emoji: '😙', names: ['kissing_smiling', 'kiss'] },
+            { emoji: '😚', names: ['kissing_closed', 'kiss'] },
+            { emoji: '😋', names: ['yum', 'delicious', 'tasty'] },
+            { emoji: '😛', names: ['stuck_out_tongue', 'tongue'] },
+            { emoji: '😝', names: ['stuck_out_tongue_closed', 'silly'] },
+            { emoji: '😜', names: ['stuck_out_tongue_wink', 'wink'] },
+            { emoji: '🤪', names: ['zany', 'crazy', 'silly'] },
+            { emoji: '🤨', names: ['raised_eyebrow', 'suspicious'] },
+            { emoji: '🧐', names: ['monocle', 'thinking'] },
+            { emoji: '🤓', names: ['nerd', 'geek'] },
+            { emoji: '😎', names: ['sunglasses', 'cool', 'shades'] },
+            { emoji: '🤩', names: ['star_struck', 'star'] },
+            { emoji: '🥳', names: ['partying', 'party', 'celebration'] },
+            { emoji: '😏', names: ['smirk', 'smug'] },
+            { emoji: '😒', names: ['unamused', 'meh'] },
+            { emoji: '😞', names: ['disappointed', 'sad'] },
+            { emoji: '😔', names: ['pensive', 'sad'] },
+            { emoji: '😟', names: ['worried', 'concerned'] },
+            { emoji: '😕', names: ['confused', 'hmm'] },
+            { emoji: '🙁', names: ['slightly_frowning', 'frown'] },
+            { emoji: '😣', names: ['persevere', 'struggling'] },
+            { emoji: '😖', names: ['confounded', 'frustrated'] },
+            { emoji: '😫', names: ['tired', 'exhausted'] },
+            { emoji: '😩', names: ['weary', 'tired'] },
+            { emoji: '🥺', names: ['pleading', 'puppy_eyes'] },
+            { emoji: '😢', names: ['cry', 'sad', 'tears'] },
+            { emoji: '😭', names: ['sob', 'crying', 'tears'] },
+            { emoji: '😤', names: ['triumph', 'huff'] },
+            { emoji: '😠', names: ['angry', 'mad'] },
+            { emoji: '😡', names: ['rage', 'angry', 'mad'] },
+            { emoji: '🤬', names: ['cursing', 'swearing'] },
+            { emoji: '🤯', names: ['exploding_head', 'mind_blown'] },
+            { emoji: '😳', names: ['flushed', 'blush'] },
+            { emoji: '🥵', names: ['hot', 'sweating'] },
+            { emoji: '🥶', names: ['cold', 'freezing'] },
+            { emoji: '😱', names: ['scream', 'shocked', 'surprised'] },
+            { emoji: '😨', names: ['fearful', 'scared'] },
+            { emoji: '😰', names: ['cold_sweat', 'nervous'] },
+            { emoji: '😥', names: ['disappointed_relieved', 'whew'] },
+            { emoji: '😓', names: ['sweat', 'nervous'] },
+            { emoji: '🤗', names: ['hugs', 'hug'] },
+            { emoji: '🤔', names: ['thinking', 'hmm'] },
+            { emoji: '🤭', names: ['hand_over_mouth', 'shh'] },
+            { emoji: '🤫', names: ['shushing', 'shh', 'quiet'] },
+            { emoji: '🤥', names: ['lying', 'liar'] },
+            { emoji: '😶', names: ['no_mouth', 'mute'] },
+            { emoji: '😐', names: ['neutral', 'meh'] },
+            { emoji: '😑', names: ['expressionless', 'blank'] },
+            { emoji: '😬', names: ['grimacing', 'awkward'] },
+            { emoji: '🙄', names: ['roll_eyes', 'eyeroll'] },
+            { emoji: '😯', names: ['hushed', 'surprised'] },
+            { emoji: '😦', names: ['frowning', 'frown'] },
+            { emoji: '😧', names: ['anguished', 'pain'] },
+            { emoji: '😮', names: ['open_mouth', 'surprised'] },
+            { emoji: '😲', names: ['astonished', 'shocked'] },
+            { emoji: '🥱', names: ['yawning', 'tired', 'sleepy'] },
+            { emoji: '😴', names: ['sleeping', 'sleep', 'zzz'] },
+            { emoji: '🤤', names: ['drooling', 'drool'] },
+            { emoji: '😪', names: ['sleepy', 'tired'] },
+            { emoji: '😵', names: ['dizzy', 'confused'] },
+            { emoji: '🤐', names: ['zipper_mouth', 'secret'] },
+            { emoji: '🥴', names: ['woozy', 'dizzy'] },
+            { emoji: '🤢', names: ['nauseated', 'sick'] },
+            { emoji: '🤮', names: ['vomiting', 'sick'] },
+            { emoji: '🤧', names: ['sneezing', 'sneeze'] },
+            { emoji: '😷', names: ['mask', 'sick'] },
+            { emoji: '🤒', names: ['thermometer', 'sick', 'fever'] },
+            { emoji: '🤕', names: ['head_bandage', 'injured'] },
+            { emoji: '🤑', names: ['money_mouth', 'rich', 'money'] },
+            { emoji: '🤠', names: ['cowboy', 'hat'] },
+            { emoji: '😈', names: ['smiling_imp', 'devil', 'evil'] },
+            { emoji: '👿', names: ['imp', 'devil', 'evil'] },
+            { emoji: '👹', names: ['ogre', 'monster'] },
+            { emoji: '👺', names: ['goblin', 'monster'] },
+            { emoji: '🤡', names: ['clown', 'clown_face'] },
+            { emoji: '💩', names: ['poop', 'poo', 'shit'] },
+            { emoji: '👻', names: ['ghost', 'spooky'] },
+            { emoji: '💀', names: ['skull', 'death', 'dead'] },
+            { emoji: '☠️', names: ['skull_crossbones', 'death', 'danger'] },
+            { emoji: '👽', names: ['alien', 'ufo', 'space'] },
+            { emoji: '👾', names: ['space_invader', 'game', 'arcade'] },
+            { emoji: '🤖', names: ['robot', 'bot'] },
+            { emoji: '🎃', names: ['jack_o_lantern', 'halloween', 'pumpkin'] },
+            { emoji: '😺', names: ['smiley_cat', 'cat', 'happy'] },
+            { emoji: '😸', names: ['smile_cat', 'cat', 'happy'] },
+            { emoji: '😹', names: ['joy_cat', 'cat', 'tears'] },
+            { emoji: '😻', names: ['heart_eyes_cat', 'cat', 'love'] },
+            { emoji: '😼', names: ['smirk_cat', 'cat'] },
+            { emoji: '😽', names: ['kissing_cat', 'cat', 'kiss'] },
+            { emoji: '🙀', names: ['scream_cat', 'cat', 'scared'] },
+            { emoji: '😿', names: ['crying_cat', 'cat', 'sad'] },
+            { emoji: '😾', names: ['pouting_cat', 'cat', 'angry'] },
+            { emoji: '👋', names: ['wave', 'hello', 'hi', 'bye'] },
+            { emoji: '🤚', names: ['raised_back_of_hand', 'stop'] },
+            { emoji: '🖐️', names: ['raised_hand', 'stop', 'high_five'] },
+            { emoji: '✋', names: ['hand', 'stop', 'high_five'] },
+            { emoji: '🖖', names: ['vulcan_salute', 'spock', 'star_trek'] },
+            { emoji: '👌', names: ['ok_hand', 'ok', 'perfect'] },
+            { emoji: '🤌', names: ['pinched_fingers', 'italian'] },
+            { emoji: '🤏', names: ['pinching_hand', 'small'] },
+            { emoji: '✌️', names: ['v', 'victory', 'peace'] },
+            { emoji: '🤞', names: ['crossed_fingers', 'luck', 'fingers_crossed'] },
+            { emoji: '🤟', names: ['love_you', 'ily'] },
+            { emoji: '🤘', names: ['metal', 'rock', 'horns'] },
+            { emoji: '🤙', names: ['call_me', 'phone'] },
+            { emoji: '👈', names: ['point_left', 'left'] },
+            { emoji: '👉', names: ['point_right', 'right'] },
+            { emoji: '👆', names: ['point_up_2', 'up'] },
+            { emoji: '🖕', names: ['middle_finger', 'flip', 'rude'] },
+            { emoji: '👇', names: ['point_down', 'down'] },
+            { emoji: '☝️', names: ['point_up', 'up'] },
+            { emoji: '👍', names: ['thumbsup', 'like', 'yes', 'approve'] },
+            { emoji: '👎', names: ['thumbsdown', 'dislike', 'no'] },
+            { emoji: '✊', names: ['fist', 'punch', 'power'] },
+            { emoji: '👊', names: ['punch', 'fist', 'bump'] },
+            { emoji: '🤛', names: ['left_fist', 'fist'] },
+            { emoji: '🤜', names: ['right_fist', 'fist'] },
+            { emoji: '👏', names: ['clap', 'applause', 'applaud'] },
+            { emoji: '🙌', names: ['raised_hands', 'hallelujah', 'praise'] },
+            { emoji: '👐', names: ['open_hands', 'open'] },
+            { emoji: '🤲', names: ['palms_up', 'pray', 'please'] },
+            { emoji: '🤝', names: ['handshake', 'deal', 'agreement'] },
+            { emoji: '🙏', names: ['pray', 'please', 'thanks'] },
+            { emoji: '✍️', names: ['writing_hand', 'write', 'pen'] },
+            { emoji: '💅', names: ['nail_care', 'nail_polish', 'manicure'] },
+            { emoji: '🤳', names: ['selfie', 'camera'] },
+            { emoji: '💪', names: ['muscle', 'strong', 'flex', 'biceps'] },
+            { emoji: '🦾', names: ['mechanical_arm', 'prosthetic'] },
+            { emoji: '🦿', names: ['mechanical_leg', 'prosthetic'] },
+            { emoji: '🦵', names: ['leg', 'limb'] },
+            { emoji: '🦶', names: ['foot', 'feet'] },
+            { emoji: '👂', names: ['ear', 'hear', 'listen'] },
+            { emoji: '🦻', names: ['ear_with_hearing_aid', 'hearing'] },
+            { emoji: '👃', names: ['nose', 'smell'] },
+            { emoji: '🧠', names: ['brain', 'think', 'smart'] },
+            { emoji: '🦷', names: ['tooth', 'teeth', 'dental'] },
+            { emoji: '🦴', names: ['bone', 'skeleton'] },
+            { emoji: '👀', names: ['eyes', 'see', 'look', 'watch'] },
+            { emoji: '👁️', names: ['eye', 'see'] },
+            { emoji: '👅', names: ['tongue', 'taste'] },
+            { emoji: '👄', names: ['lips', 'kiss', 'mouth'] },
+            { emoji: '💋', names: ['kiss', 'lipstick', 'love'] },
+            { emoji: '💘', names: ['cupid', 'love', 'heart'] },
+            { emoji: '💝', names: ['gift_heart', 'gift', 'present'] },
+            { emoji: '💖', names: ['sparkling_heart', 'love'] },
+            { emoji: '💗', names: ['heartpulse', 'love', 'growing'] },
+            { emoji: '💓', names: ['heartbeat', 'love', 'pulse'] },
+            { emoji: '💞', names: ['revolving_hearts', 'love'] },
+            { emoji: '💕', names: ['two_hearts', 'love'] },
+            { emoji: '💟', names: ['heart_decoration', 'love'] },
+            { emoji: '❣️', names: ['heart_exclamation', 'love'] },
+            { emoji: '💔', names: ['broken_heart', 'sad', 'breakup'] },
+            { emoji: '❤️', names: ['heart', 'love', 'red_heart'] },
+            { emoji: '🧡', names: ['orange_heart', 'love'] },
+            { emoji: '💛', names: ['yellow_heart', 'love', 'friendship'] },
+            { emoji: '💚', names: ['green_heart', 'love'] },
+            { emoji: '💙', names: ['blue_heart', 'love'] },
+            { emoji: '💜', names: ['purple_heart', 'love'] },
+            { emoji: '🖤', names: ['black_heart', 'love', 'dark'] },
+            { emoji: '🤍', names: ['white_heart', 'love'] },
+            { emoji: '🤎', names: ['brown_heart', 'love'] },
+            { emoji: '💯', names: ['100', 'hundred', 'perfect', 'score'] },
+            { emoji: '💢', names: ['anger', 'angry', 'mad'] },
+            { emoji: '💥', names: ['boom', 'collision', 'explosion'] },
+            { emoji: '💫', names: ['dizzy', 'star', 'sparkle'] },
+            { emoji: '💦', names: ['sweat_drops', 'water', 'drip'] },
+            { emoji: '💨', names: ['dash', 'wind', 'fast', 'run'] },
+            { emoji: '🕳️', names: ['hole', 'black_hole'] },
+            { emoji: '💣', names: ['bomb', 'explosion'] },
+            { emoji: '💬', names: ['speech_balloon', 'chat', 'talk'] },
+            { emoji: '👁️‍🗨️', names: ['eye_speech', 'witness'] },
+            { emoji: '🗨️', names: ['left_speech', 'chat'] },
+            { emoji: '🗯️', names: ['right_anger', 'mad'] },
+            { emoji: '💭', names: ['thought_balloon', 'think', 'thought'] },
+            { emoji: '💤', names: ['zzz', 'sleep', 'tired'] }
         ];
 
         // Monaco Editor instances map
@@ -1957,6 +2198,7 @@
             applySyntaxHighlighting();
             notifyChange();
             handleSlashCommand();
+            handleEmojiCommand();
         });
 
         // Handle checkbox clicks and table cell selection
@@ -3052,6 +3294,162 @@
             notifyChange();
         }
 
+        // Handle emoji autocomplete
+        function handleEmojiCommand() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            const textContent = range.startContainer.textContent || '';
+            const cursorPos = range.startOffset;
+
+            // Check if we typed ':' at the start of a line or after space
+            const textBefore = textContent.substring(0, cursorPos);
+            const lastColonIndex = textBefore.lastIndexOf(':');
+
+            if (lastColonIndex !== -1) {
+                const charBefore = lastColonIndex > 0 ? textBefore[lastColonIndex - 1] : '\n';
+                // Check if there's a space or newline before the colon
+                if (charBefore === '\n' || charBefore === ' ') {
+                    // Check if there's another colon after (complete :name: syntax)
+                    const textAfter = textContent.substring(cursorPos);
+                    const nextColonIndex = textAfter.indexOf(':');
+                    
+                    // If there's a colon right after cursor, it might be a complete :name: pattern
+                    // But we still want to show the menu if there's text between the colons
+                    if (nextColonIndex === 0) {
+                        // Check if there's text between the two colons
+                        const nameText = textBefore.substring(lastColonIndex + 1);
+                        if (nameText.length > 0) {
+                            // This is a complete :name: pattern, try to convert it
+                            convertEmojiNameToEmoji(range, lastColonIndex, cursorPos + 1);
+                            hideEmojiMenu();
+                            return;
+                        }
+                    }
+                    
+                    // Extract the query between the colon and cursor
+                    const query = textBefore.substring(lastColonIndex + 1).toLowerCase();
+                    if (query.length > 0 || nextColonIndex === -1) {
+                        showEmojiMenu(query, range);
+                        return;
+                    }
+                }
+            }
+
+            hideEmojiMenu();
+        }
+
+        function convertEmojiNameToEmoji(range, startColonIndex, endColonIndex) {
+            const textContent = range.startContainer.textContent || '';
+            const nameText = textContent.substring(startColonIndex + 1, endColonIndex - 1).toLowerCase();
+            
+            // Find matching emoji
+            const matchingEmoji = emojiData.find(emoji => 
+                emoji.names.some(name => name.toLowerCase() === nameText)
+            );
+            
+            if (matchingEmoji) {
+                // Replace :name: with emoji
+                range.setStart(range.startContainer, startColonIndex);
+                range.setEnd(range.startContainer, endColonIndex);
+                range.deleteContents();
+                
+                const textNode = document.createTextNode(matchingEmoji.emoji);
+                range.insertNode(textNode);
+                
+                // Move cursor after the emoji
+                range.setStartAfter(textNode);
+                range.collapse(true);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                notifyChange();
+            }
+        }
+
+        function showEmojiMenu(query, range) {
+            // Filter emojis based on query
+            emojiMenuItems = emojiData.filter(emoji => {
+                return emoji.names.some(name => name.toLowerCase().includes(query));
+            }).slice(0, 20); // Limit to 20 results
+
+            if (emojiMenuItems.length === 0) {
+                hideEmojiMenu();
+                return;
+            }
+
+            selectedEmojiIndex = 0;
+
+            // Render menu
+            emojiMenu.innerHTML = emojiMenuItems.map((item, index) => {
+                const primaryName = item.names[0];
+                const aliases = item.names.slice(1, 3).join(', ');
+                return `
+                    <div class="menu-item ${index === 0 ? 'selected' : ''}" data-index="${index}">
+                        <div class="emoji">${item.emoji}</div>
+                        <div class="name">:${primaryName}:</div>
+                        ${aliases ? `<div class="aliases">${aliases}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            // Position menu at cursor
+            const rect = range.getBoundingClientRect();
+            emojiMenu.style.left = rect.left + 'px';
+            emojiMenu.style.top = (rect.bottom + 4) + 'px';
+            emojiMenu.style.display = 'block';
+
+            emojiMenuVisible = true;
+            updateEmojiMenuSelection();
+
+            // Add click handlers
+            emojiMenu.querySelectorAll('.menu-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    insertEmoji(parseInt(item.dataset.index));
+                });
+            });
+        }
+
+        function hideEmojiMenu() {
+            emojiMenu.style.display = 'none';
+            emojiMenuVisible = false;
+        }
+
+        function insertEmoji(index) {
+            const emojiItem = emojiMenuItems[index];
+            if (!emojiItem) return;
+
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            const textContent = range.startContainer.textContent || '';
+            const cursorPos = range.startOffset;
+            const textBefore = textContent.substring(0, cursorPos);
+            const lastColonIndex = textBefore.lastIndexOf(':');
+
+            if (lastColonIndex === -1) return;
+
+            // Delete the colon and query
+            range.setStart(range.startContainer, lastColonIndex);
+            range.deleteContents();
+
+            // Insert the emoji
+            const textNode = document.createTextNode(emojiItem.emoji);
+            range.insertNode(textNode);
+            
+            // Move cursor after the emoji
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            hideEmojiMenu();
+            notifyChange();
+        }
+
         // Keyboard navigation for slash menu and block exit
         document.addEventListener('keydown', (e) => {
             // Don't interfere with Monaco editors
@@ -3339,6 +3737,28 @@
                 }
             }
 
+            // Handle emoji menu navigation (check first, before slash menu)
+            if (emojiMenuVisible) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedEmojiIndex = Math.min(selectedEmojiIndex + 1, emojiMenuItems.length - 1);
+                    updateEmojiMenuSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedEmojiIndex = Math.max(selectedEmojiIndex - 1, 0);
+                    updateEmojiMenuSelection();
+                } else if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    insertEmoji(selectedEmojiIndex);
+                } else if (e.key === 'Escape') {
+                    hideEmojiMenu();
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    insertEmoji(selectedEmojiIndex);
+                }
+                return;
+            }
+
             // Handle slash menu navigation
             if (slashMenuVisible) {
                 if (e.key === 'ArrowDown') {
@@ -3473,6 +3893,17 @@
             slashMenu.querySelectorAll('.menu-item').forEach((item, index) => {
                 item.classList.toggle('selected', index === selectedItemIndex);
             });
+        }
+
+        function updateEmojiMenuSelection() {
+            emojiMenu.querySelectorAll('.menu-item').forEach((item, index) => {
+                item.classList.toggle('selected', index === selectedEmojiIndex);
+            });
+            // Scroll selected item into view
+            const selectedItem = emojiMenu.querySelector('.menu-item.selected');
+            if (selectedItem) {
+                selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
         }
 
         // Update block hint visibility based on cursor position
