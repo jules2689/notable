@@ -70,13 +70,16 @@ class TooltipNSView: NSView {
     private func setupClickMonitor() {
         removeClickMonitor()
         
-        // Monitor for mouse down events to hide tooltip
+        // Monitor for mouse down events to hide tooltip when clicked anywhere
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self = self else { return event }
-            // Hide tooltip if it's showing
+            guard let self = self, self.window != nil else { return event }
+            
+            // Hide tooltip if it's showing - hide on any click, not just within view bounds
+            // This ensures tooltips disappear when buttons are clicked
             if self.tooltipWindow != nil {
                 self.hideTooltip()
             }
+            
             return event
         }
     }
@@ -138,6 +141,14 @@ class TooltipNSView: NSView {
         timeoutTimer?.invalidate()
         timeoutTimer = nil
         hideTooltip()
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        // Hide tooltip when the view is clicked
+        if tooltipWindow != nil {
+            hideTooltip()
+        }
     }
     
     

@@ -293,7 +293,7 @@ class GitService {
         
         // Debug: Print remote URL
         let remoteURLString = remote.url.absoluteString
-        print("📤 Pushing to remote: \(remoteURLString)")
+        print("📤 Pushing to remote: [REDACTED]")
         
         // Configure HTTPS credentials if needed
         if remoteURLString.hasPrefix("https://") {

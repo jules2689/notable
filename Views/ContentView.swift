@@ -808,7 +808,7 @@ struct LoadingScreenView: View {
                 // Background that covers everything including title bar
                 Color(nsColor: .windowBackgroundColor)
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .ignoresSafeArea(.all)
+                    .ignoresSafeArea()
                 
                 // Loading indicator
                 VStack(spacing: 16) {
@@ -823,7 +823,7 @@ struct LoadingScreenView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea(.all)
+        .ignoresSafeArea()
         .allowsHitTesting(true) // Block all interactions
         .transition(.opacity)
     }

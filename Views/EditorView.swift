@@ -126,7 +126,7 @@ struct EditorView: View {
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
         .padding(.leading, 8 + tabBarLeadingPadding) // 8px base + dynamic padding for traffic lights
         .padding(.trailing, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: .textBackgroundColor))
         .animation(nil, value: tabBarLeadingPadding) // No animation on padding to prevent bounce
     }
     
@@ -244,11 +244,11 @@ struct EditorView: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color(nsColor: .controlBackgroundColor) : Color.clear)
+                .fill(isSelected ? Color(nsColor: .controlBackgroundColor) : Color(nsColor: .windowBackgroundColor).opacity(0.4))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isSelected ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear, lineWidth: 1)
+                .stroke(isSelected ? Color(nsColor: .separatorColor).opacity(0.5) : Color(nsColor: .separatorColor).opacity(0.15), lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture {
