@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+    <!-- Monaco Editor will be loaded from local bundle -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""/>
@@ -115,8 +114,52 @@
             color: inherit;
         }
 
-        pre code.hljs {
-            background-color: transparent !important;
+        /* Monaco Editor container */
+        pre .monaco-editor-container {
+            width: 100%;
+            height: auto;
+            min-height: 100px;
+            border-radius: 0;
+            overflow: hidden;
+            background: transparent;
+        }
+        
+        pre .monaco-editor-container .monaco-editor {
+            background: transparent !important;
+        }
+        
+        pre .monaco-editor-container .monaco-editor .monaco-editor-background {
+            background: transparent !important;
+        }
+        
+        pre .monaco-editor-container .monaco-editor .margin {
+            background: transparent !important;
+        }
+        
+        pre .code-language-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--secondary-color);
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            user-select: none;
+        }
+        pre:hover .code-language-button {
+            opacity: 1;
+        }
+        pre .code-language-button:hover {
+            background: var(--code-bg);
+            color: var(--text-color);
         }
 
         /* Tables */
@@ -312,6 +355,35 @@
             font-size: 12px;
             color: var(--secondary-color);
         }
+        
+        /* Language menu */
+        #language-menu {
+            position: fixed;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 10000;
+            display: none;
+            min-width: 200px;
+        }
+        #language-menu.show {
+            display: block;
+        }
+        #language-menu .menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        #language-menu .menu-item:hover,
+        #language-menu .menu-item.selected {
+            background: var(--code-bg);
+        }
 
         /* Block exit hint tooltip */
         #block-hint {
@@ -385,6 +457,7 @@
 <body>
     <div id="editor" contenteditable="true"></div>
     <div id="slash-menu"></div>
+    <div id="language-menu"></div>
     <div id="block-hint"><kbd>Shift</kbd> + <kbd>Enter</kbd> to exit block</div>
     <div id="table-hint">
         <div class="hint-section"><kbd>Tab</kbd> next cell · <kbd>⇧</kbd>+<kbd>Tab</kbd> prev cell</div>
@@ -393,7 +466,22 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Monaco Editor loader - loads from local bundle -->
+    <script>
+        // Monaco Editor will be loaded from the app bundle
+        // The monaco-editor folder should be in the Resources folder with the following structure:
+        // Resources/monaco-editor/min/vs/loader.js
+        // Resources/monaco-editor/min/vs/editor/editor.main.js
+        // etc.
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'monaco-editor/min/vs/loader.js';
+            script.onerror = function() {
+                console.error('Monaco Editor loader not found. Please ensure monaco-editor/min/vs/loader.js is in the Resources folder.');
+            };
+            document.head.appendChild(script);
+        })();
+    </script>
 
     <script>
         // Configure marked for GFM
@@ -497,12 +585,479 @@
             }
         ];
 
-        // Helper function to apply syntax highlighting
+        // Monaco Editor instances map
+        const monacoEditors = new Map();
+        
+        // Initialize Monaco Editor
+        let monacoInitialized = false;
+        let monacoInitPromise = null;
+        
+        function initMonaco() {
+            if (monacoInitialized) return Promise.resolve();
+            if (monacoInitPromise) return monacoInitPromise;
+            
+            monacoInitPromise = new Promise((resolve, reject) => {
+                // Check if require is available (Monaco loader)
+                if (typeof require === 'undefined') {
+                    // Wait a bit for loader to load
+                    let attempts = 0;
+                    const maxAttempts = 50; // 5 seconds total
+                    const checkRequire = () => {
+                        attempts++;
+                        if (typeof require !== 'undefined') {
+                            tryInit();
+                        } else if (attempts < maxAttempts) {
+                            setTimeout(checkRequire, 100);
+                        } else {
+                            reject(new Error('Monaco loader not available. Please ensure monaco-editor/min/vs/loader.js is in the Resources folder.'));
+                        }
+                    };
+                    checkRequire();
+                    return;
+                }
+                tryInit();
+                
+                function tryInit() {
+                    try {
+                        // Load from local bundle only (no remote sources)
+                        // Use minified version for production
+                        const localPath = 'monaco-editor/min/vs';
+                        
+                        require.config({ 
+                            paths: { 
+                                vs: localPath 
+                            } 
+                        });
+                        
+                        require(['vs/editor/editor.main'], () => {
+                            monacoInitialized = true;
+                            resolve();
+                        }, (err) => {
+                            console.error('Failed to load Monaco Editor from local bundle:', err);
+                            console.error('Please ensure monaco-editor/min/vs folder is in the Resources folder with the correct structure.');
+                            reject(err);
+                        });
+                    } catch (e) {
+                        console.error('Error initializing Monaco Editor:', e);
+                        reject(e);
+                    }
+                }
+            });
+            
+            return monacoInitPromise;
+        }
+        
+        // Map language names to Monaco language IDs
+        function getMonacoLanguageMap() {
+            return {
+                'javascript': 'javascript',
+                'typescript': 'typescript',
+                'python': 'python',
+                'java': 'java',
+                'cpp': 'cpp',
+                'c': 'c',
+                'csharp': 'csharp',
+                'swift': 'swift',
+                'go': 'go',
+                'rust': 'rust',
+                'ruby': 'ruby',
+                'php': 'php',
+                'html': 'html',
+                'css': 'css',
+                'scss': 'scss',
+                'json': 'json',
+                'xml': 'xml',
+                'yaml': 'yaml',
+                'markdown': 'markdown',
+                'sql': 'sql',
+                'bash': 'shell',
+                'shell': 'shell',
+                'dockerfile': 'dockerfile',
+                'kotlin': 'kotlin',
+                'dart': 'dart',
+                'r': 'r',
+                'matlab': 'matlab',
+                'perl': 'perl',
+                'lua': 'lua'
+            };
+        }
+        
+        // Helper function to initialize Monaco Editor for a code block
+        async function initMonacoEditor(codeElement, language) {
+            try {
+                await initMonaco();
+                
+                if (typeof monaco === 'undefined' || !monaco.editor) {
+                    console.warn('Monaco Editor not available');
+                    return null;
+                }
+                
+                if (monacoEditors.has(codeElement)) {
+                    const editor = monacoEditors.get(codeElement);
+                    if (language) {
+                        const languageMap = getMonacoLanguageMap();
+                        const monacoLanguage = languageMap[language] || language;
+                        try {
+                            monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage);
+                        } catch (e) {
+                            console.warn('Failed to update Monaco language:', e);
+                        }
+                    }
+                    return editor;
+                }
+                
+                // Get text content
+                let text = '';
+                if (monacoEditors.has(codeElement)) {
+                    try {
+                        const existingEditor = monacoEditors.get(codeElement);
+                        text = existingEditor.getValue();
+                    } catch (e) {
+                        text = codeElement.textContent || '';
+                    }
+                } else {
+                    text = codeElement.textContent || codeElement.innerText || '';
+                }
+                
+                // Create container
+                const container = document.createElement('div');
+                container.className = 'monaco-editor-container';
+                container.style.height = 'auto';
+                container.style.minHeight = '100px';
+                
+                // Clear and add container
+                codeElement.textContent = '';
+                codeElement.appendChild(container);
+                
+                // Get language
+                const languageMap = getMonacoLanguageMap();
+                const monacoLanguage = languageMap[language] || '';
+                
+                // Get background color
+                const preElement = codeElement.closest('pre');
+                const computedStyle = window.getComputedStyle(preElement);
+                const codeBgColor = computedStyle.backgroundColor || 'transparent';
+                
+                // Create editor
+                const editor = monaco.editor.create(container, {
+                    value: text,
+                    language: monacoLanguage,
+                    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'vs-dark' : 'vs',
+                    automaticLayout: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 14,
+                    lineNumbers: 'off',
+                    glyphMargin: false,
+                    folding: false,
+                    lineDecorationsWidth: 0,
+                    lineNumbersMinChars: 0,
+                    renderLineHighlight: 'none',
+                    overviewRulerBorder: false,
+                    hideCursorInOverviewRuler: true,
+                    overviewRulerLanes: 0,
+                    wordWrap: 'on',
+                    padding: { top: 0, bottom: 0 }
+                });
+                
+                // Match background color
+                setTimeout(() => {
+                    try {
+                        const editorDom = editor.getDomNode();
+                        if (editorDom) {
+                            editorDom.style.backgroundColor = codeBgColor;
+                            const editorBackground = editorDom.querySelector('.monaco-editor-background');
+                            if (editorBackground) {
+                                editorBackground.style.backgroundColor = codeBgColor;
+                            }
+                            const margin = editorDom.querySelector('.margin');
+                            if (margin) {
+                                margin.style.backgroundColor = codeBgColor;
+                            }
+                            const viewLines = editorDom.querySelector('.view-lines');
+                            if (viewLines) {
+                                viewLines.style.backgroundColor = codeBgColor;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to set Monaco background:', e);
+                    }
+                }, 100);
+                
+                // Update height
+                const updateHeight = () => {
+                    try {
+                        const contentHeight = editor.getContentHeight();
+                        container.style.height = contentHeight + 'px';
+                        editor.layout();
+                    } catch (e) {
+                        console.warn('Failed to update Monaco height:', e);
+                    }
+                };
+                
+                editor.onDidChangeModelContent(() => {
+                    updateHeight();
+                    notifyChange();
+                });
+                
+                updateHeight();
+                monacoEditors.set(codeElement, editor);
+                
+                // Theme changes
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                const themeHandler = (e) => {
+                    try {
+                        monaco.editor.setTheme(e.matches ? 'vs-dark' : 'vs');
+                    } catch (err) {
+                        console.warn('Failed to update Monaco theme:', err);
+                    }
+                };
+                mediaQuery.addEventListener('change', themeHandler);
+                
+                return editor;
+            } catch (err) {
+                console.error('Failed to initialize Monaco Editor:', err);
+                return null;
+            }
+        }
+        
+        // Helper function to apply syntax highlighting (now using Monaco)
         function applySyntaxHighlighting() {
-            document.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
-                hljs.highlightElement(block);
+            updateCodeBlockLanguageButtons();
+            
+            document.querySelectorAll('pre code').forEach((codeElement) => {
+                if (monacoEditors.has(codeElement)) return;
+                
+                // Get language
+                let language = '';
+                const classList = codeElement.className.split(/\s+/);
+                for (const className of classList) {
+                    if (className.startsWith('language-')) {
+                        language = className.substring(9);
+                        break;
+                    }
+                }
+                
+                if (!language) {
+                    language = codeElement.getAttribute('data-language') || '';
+                }
+                
+                if (language) {
+                    initMonacoEditor(codeElement, language).catch(err => {
+                        console.warn('Failed to initialize Monaco Editor:', err);
+                    });
+                }
             });
         }
+        
+        // Add language buttons to code blocks
+        function updateCodeBlockLanguageButtons() {
+            document.querySelectorAll('pre').forEach(pre => {
+                const code = pre.querySelector('code');
+                if (!code) return;
+                
+                // Extract language
+                let languageValue = '';
+                const classList = code.className.split(/\s+/);
+                for (const className of classList) {
+                    if (className.startsWith('language-')) {
+                        languageValue = className.substring(9);
+                        break;
+                    }
+                }
+                
+                if (!languageValue) {
+                    languageValue = code.getAttribute('data-language') || '';
+                }
+                
+                // Find language name
+                const programmingLanguages = [
+                    { name: 'Plain Text', value: '' },
+                    { name: 'JavaScript', value: 'javascript' },
+                    { name: 'TypeScript', value: 'typescript' },
+                    { name: 'Python', value: 'python' },
+                    { name: 'Java', value: 'java' },
+                    { name: 'C++', value: 'cpp' },
+                    { name: 'C', value: 'c' },
+                    { name: 'C#', value: 'csharp' },
+                    { name: 'Swift', value: 'swift' },
+                    { name: 'Go', value: 'go' },
+                    { name: 'Rust', value: 'rust' },
+                    { name: 'Ruby', value: 'ruby' },
+                    { name: 'PHP', value: 'php' },
+                    { name: 'HTML', value: 'html' },
+                    { name: 'CSS', value: 'css' },
+                    { name: 'SCSS', value: 'scss' },
+                    { name: 'JSON', value: 'json' },
+                    { name: 'XML', value: 'xml' },
+                    { name: 'YAML', value: 'yaml' },
+                    { name: 'Markdown', value: 'markdown' },
+                    { name: 'SQL', value: 'sql' },
+                    { name: 'Bash', value: 'bash' },
+                    { name: 'Shell', value: 'shell' },
+                    { name: 'Dockerfile', value: 'dockerfile' },
+                    { name: 'Kotlin', value: 'kotlin' },
+                    { name: 'Dart', value: 'dart' },
+                    { name: 'R', value: 'r' },
+                    { name: 'MATLAB', value: 'matlab' },
+                    { name: 'Perl', value: 'perl' },
+                    { name: 'Lua', value: 'lua' }
+                ];
+                
+                const language = programmingLanguages.find(lang => lang.value === languageValue);
+                const languageName = language ? language.name : (languageValue || 'Plain Text');
+                
+                // Remove existing button
+                const existingButton = pre.querySelector('.code-language-button');
+                if (existingButton) {
+                    existingButton.remove();
+                }
+                
+                // Create button
+                const button = document.createElement('div');
+                button.className = 'code-language-button';
+                button.textContent = languageName;
+                button.title = 'Click to change language';
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const buttonRect = button.getBoundingClientRect();
+                    showLanguageMenuForButton(buttonRect, pre);
+                });
+                pre.appendChild(button);
+            });
+        }
+
+        // Language menu functions
+        const languageMenu = document.getElementById('language-menu');
+        let currentPreElement = null;
+        
+        const programmingLanguages = [
+            { name: 'Plain Text', value: '' },
+            { name: 'JavaScript', value: 'javascript' },
+            { name: 'TypeScript', value: 'typescript' },
+            { name: 'Python', value: 'python' },
+            { name: 'Java', value: 'java' },
+            { name: 'C++', value: 'cpp' },
+            { name: 'C', value: 'c' },
+            { name: 'C#', value: 'csharp' },
+            { name: 'Swift', value: 'swift' },
+            { name: 'Go', value: 'go' },
+            { name: 'Rust', value: 'rust' },
+            { name: 'Ruby', value: 'ruby' },
+            { name: 'PHP', value: 'php' },
+            { name: 'HTML', value: 'html' },
+            { name: 'CSS', value: 'css' },
+            { name: 'SCSS', value: 'scss' },
+            { name: 'JSON', value: 'json' },
+            { name: 'XML', value: 'xml' },
+            { name: 'YAML', value: 'yaml' },
+            { name: 'Markdown', value: 'markdown' },
+            { name: 'SQL', value: 'sql' },
+            { name: 'Bash', value: 'bash' },
+            { name: 'Shell', value: 'shell' },
+            { name: 'Dockerfile', value: 'dockerfile' },
+            { name: 'Kotlin', value: 'kotlin' },
+            { name: 'Dart', value: 'dart' },
+            { name: 'R', value: 'r' },
+            { name: 'MATLAB', value: 'matlab' },
+            { name: 'Perl', value: 'perl' },
+            { name: 'Lua', value: 'lua' }
+        ];
+        
+        function showLanguageMenuForButton(buttonRect, preElement) {
+            currentPreElement = preElement;
+            const code = preElement.querySelector('code');
+            if (!code) return;
+            
+            // Get current language
+            let currentLanguage = '';
+            const classList = code.className.split(/\s+/);
+            for (const className of classList) {
+                if (className.startsWith('language-')) {
+                    currentLanguage = className.substring(9);
+                    break;
+                }
+            }
+            if (!currentLanguage) {
+                currentLanguage = code.getAttribute('data-language') || '';
+            }
+            
+            // Populate menu
+            languageMenu.innerHTML = '';
+            programmingLanguages.forEach(lang => {
+                const item = document.createElement('div');
+                item.className = 'menu-item';
+                if (lang.value === currentLanguage) {
+                    item.classList.add('selected');
+                }
+                item.textContent = lang.name;
+                item.addEventListener('click', () => {
+                    updateCodeBlockLanguage(preElement, lang.value);
+                    hideLanguageMenu();
+                });
+                languageMenu.appendChild(item);
+            });
+            
+            // Position menu
+            languageMenu.style.left = (buttonRect.right - languageMenu.offsetWidth) + 'px';
+            languageMenu.style.top = (buttonRect.bottom + 4) + 'px';
+            languageMenu.classList.add('show');
+        }
+        
+        function hideLanguageMenu() {
+            languageMenu.classList.remove('show');
+            currentPreElement = null;
+        }
+        
+        function updateCodeBlockLanguage(preElement, language) {
+            const code = preElement.querySelector('code');
+            if (!code) return;
+            
+            // Remove existing language classes
+            const classList = Array.from(code.classList);
+            classList.forEach(cls => {
+                if (cls.startsWith('language-')) {
+                    code.classList.remove(cls);
+                }
+            });
+            
+            // Set new language
+            if (language) {
+                code.classList.add(`language-${language}`);
+                code.setAttribute('data-language', language);
+            } else {
+                code.removeAttribute('data-language');
+            }
+            
+            // Update Monaco editor if it exists
+            if (monacoEditors.has(code)) {
+                const editor = monacoEditors.get(code);
+                const languageMap = getMonacoLanguageMap();
+                const monacoLanguage = languageMap[language] || language;
+                try {
+                    if (monaco && monaco.editor) {
+                        monaco.editor.setModelLanguage(editor.getModel(), monacoLanguage || 'plaintext');
+                    }
+                } catch (e) {
+                    console.warn('Failed to update Monaco language:', e);
+                }
+            } else {
+                // Initialize Monaco if not already initialized
+                initMonacoEditor(code, language).catch(err => {
+                    console.warn('Failed to initialize Monaco Editor:', err);
+                });
+            }
+            
+            // Update button
+            updateCodeBlockLanguageButtons();
+        }
+        
+        // Close language menu on outside click
+        document.addEventListener('click', (e) => {
+            if (!languageMenu.contains(e.target) && !e.target.closest('.code-language-button')) {
+                hideLanguageMenu();
+            }
+        });
 
         // Initialize iframes after they're in the DOM
         function initializeIframes() {
@@ -902,8 +1457,37 @@
         // Convert HTML back to markdown
         function getMarkdown() {
             try {
+                // Extract content from Monaco editors before cloning
+                document.querySelectorAll('pre code').forEach(codeElement => {
+                    if (monacoEditors.has(codeElement)) {
+                        try {
+                            const monacoEditor = monacoEditors.get(codeElement);
+                            const content = monacoEditor.getValue();
+                            // Store in data attribute for later retrieval
+                            codeElement.setAttribute('data-original-text', content);
+                        } catch (e) {
+                            console.warn('Failed to get content from Monaco editor:', e);
+                        }
+                    }
+                });
+                
                 // Clone the editor content to avoid modifying the DOM
                 const clone = editor.cloneNode(true);
+                
+                // Remove Monaco containers and restore text content
+                clone.querySelectorAll('pre code').forEach(codeElement => {
+                    const originalText = codeElement.getAttribute('data-original-text');
+                    if (originalText !== null) {
+                        // Remove Monaco container
+                        const monacoContainer = codeElement.querySelector('.monaco-editor-container');
+                        if (monacoContainer) {
+                            monacoContainer.remove();
+                        }
+                        // Restore original text
+                        codeElement.textContent = originalText;
+                        codeElement.removeAttribute('data-original-text');
+                    }
+                });
 
                 // Unwrap tables from table-wrapper and remove controls
                 clone.querySelectorAll('.table-wrapper').forEach(wrapper => {
