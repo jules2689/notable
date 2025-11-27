@@ -441,16 +441,16 @@ struct HierarchicalNoteItemRow: View {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.secondary)
-                            .frame(width: 16, height: 16)
+                            .frame(width: 10, height: 10)
                     }
                     .buttonStyle(.plain)
                     .contentShape(Rectangle())
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20) // Larger hit area for easier clicking
                     .allowsHitTesting(true)
                 } else {
                     // Spacer for non-folder items to align with folders
                     Spacer()
-                        .frame(width: 16)
+                        .frame(width: 20) // Match the button width
                 }
                 
                 // Show icon for notes and folders (both clickable)
@@ -461,8 +461,7 @@ struct HierarchicalNoteItemRow: View {
                     .allowsHitTesting(true)
                     .quickTooltip("Change icon")
 
-                // Make text area tappable for notes only
-                // For folders, only the chevron button toggles expansion
+                // Make text area tappable for both notes and folders
                 Text(item.name)
                     .lineLimit(1)
                     .contentShape(Rectangle())
@@ -472,8 +471,12 @@ struct HierarchicalNoteItemRow: View {
                             return
                         }
                         
-                        // Only handle note selection here - folders use chevron button only
-                        if case .note(let note) = item {
+                        // Handle folder expansion when clicking folder name
+                        if item.isFolder, let folder = folder {
+                            viewModel.toggleFolderExpansion(folder)
+                        }
+                        // Handle note selection
+                        else if case .note(let note) = item {
                             let isShiftHeld = NSEvent.modifierFlags.contains(.shift)
                             print("📝 SidebarView: Selecting note \(note.title), shift=\(isShiftHeld)")
                             viewModel.selectNote(note)
