@@ -4,16 +4,18 @@ struct HelpNoteView: View {
     var viewModel: NotesViewModel?
     @Environment(\.dismiss) private var dismiss
     @State private var helpContent: String = ""
+    @State private var markdownBlocks: [MarkdownBlock] = []
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(helpContent)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(Array(markdownBlocks.enumerated()), id: \.offset) { _, block in
+                        renderBlock(block)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
             }
             .scrollContentBackground(.hidden)
             .navigationTitle("Notable Help")
@@ -28,6 +30,49 @@ struct HelpNoteView: View {
             .onAppear {
                 loadHelpContent()
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func renderBlock(_ block: MarkdownBlock) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            Text(text)
+                .font(level == 1 ? .largeTitle : (level == 2 ? .title : .title3))
+                .fontWeight(.bold)
+                .padding(.top, level == 1 ? 0 : 8)
+                .textSelection(.enabled)
+        case .paragraph(let text):
+            Text(parseInlineMarkdown(text))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        case .list(let items, let ordered):
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .top, spacing: 8) {
+                        if ordered {
+                            Text("\(index + 1).")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                        }
+                        Text(parseInlineMarkdown(item))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.leading, 8)
+        }
+    }
+    
+    private func parseInlineMarkdown(_ text: String) -> AttributedString {
+        do {
+            return try AttributedString(markdown: text)
+        } catch {
+            return AttributedString(text)
         }
     }
     
@@ -122,6 +167,110 @@ If you encounter issues with note loading or saving, check the storage location 
 
 Logs are stored in the app's container directory and can be accessed from the settings panel for debugging purposes.
 """
+        
+        // Parse markdown into blocks
+        markdownBlocks = parseMarkdown(helpContent)
     }
+    
+    private func parseMarkdown(_ content: String) -> [MarkdownBlock] {
+        var blocks: [MarkdownBlock] = []
+        let lines = content.components(separatedBy: .newlines)
+        var i = 0
+        
+        while i < lines.count {
+            let line = lines[i].trimmingCharacters(in: .whitespaces)
+            
+            if line.isEmpty {
+                i += 1
+                continue
+            }
+            
+            // Check for headings
+            if line.hasPrefix("#") {
+                let level = line.prefix(while: { $0 == "#" }).count
+                let text = String(line.dropFirst(level).trimmingCharacters(in: .whitespaces))
+                blocks.append(.heading(level: level, text: text))
+                i += 1
+                continue
+            }
+            
+            // Check for ordered list
+            if line.range(of: #"^\d+\.\s+"#, options: .regularExpression) != nil {
+                var listItems: [String] = []
+                
+                while i < lines.count {
+                    let currentLine = lines[i].trimmingCharacters(in: .whitespaces)
+                    if currentLine.range(of: #"^\d+\.\s+"#, options: .regularExpression) != nil {
+                        // Extract text after "number. " by removing the prefix
+                        let item = currentLine.replacingOccurrences(of: #"^\d+\.\s+"#, with: "", options: .regularExpression)
+                        listItems.append(item)
+                        i += 1
+                    } else if currentLine.isEmpty {
+                        i += 1
+                        break
+                    } else {
+                        break
+                    }
+                }
+                
+                if !listItems.isEmpty {
+                    blocks.append(.list(items: listItems, ordered: true))
+                    continue
+                }
+            }
+            
+            // Check for unordered list
+            if line.hasPrefix("- ") || line.hasPrefix("* ") {
+                var listItems: [String] = []
+                
+                while i < lines.count {
+                    let currentLine = lines[i].trimmingCharacters(in: .whitespaces)
+                    if currentLine.hasPrefix("- ") {
+                        listItems.append(String(currentLine.dropFirst(2)))
+                        i += 1
+                    } else if currentLine.hasPrefix("* ") {
+                        listItems.append(String(currentLine.dropFirst(2)))
+                        i += 1
+                    } else if currentLine.isEmpty {
+                        i += 1
+                        break
+                    } else {
+                        break
+                    }
+                }
+                
+                if !listItems.isEmpty {
+                    blocks.append(.list(items: listItems, ordered: false))
+                    continue
+                }
+            }
+            
+            // Regular paragraph
+            var paragraphLines: [String] = [line]
+            i += 1
+            
+            while i < lines.count {
+                let nextLine = lines[i].trimmingCharacters(in: .whitespaces)
+                if nextLine.isEmpty || nextLine.hasPrefix("#") || nextLine.hasPrefix("- ") || nextLine.hasPrefix("* ") || nextLine.range(of: #"^\d+\.\s+"#, options: .regularExpression) != nil {
+                    break
+                }
+                paragraphLines.append(nextLine)
+                i += 1
+            }
+            
+            let paragraphText = paragraphLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            if !paragraphText.isEmpty {
+                blocks.append(.paragraph(text: paragraphText))
+            }
+        }
+        
+        return blocks
+    }
+}
+
+enum MarkdownBlock {
+    case heading(level: Int, text: String)
+    case paragraph(text: String)
+    case list(items: [String], ordered: Bool)
 }
 
